@@ -15,6 +15,8 @@ You will find
 ## Project Management & Tasks
 
 Quick links to our project planning and tracking documents.
+You can fill in the task by yourself, cause I'm just copying the format you use on Notion. I do not know exactly what are the use of these.
+
 
 - [Team Workspace Guide](Sync%20files%20on%20GitHub/README.md) - [To be filled]
 - [Demo](Sync%20files%20on%20GitHub/Projects/Demo.md) - [To be filled]
