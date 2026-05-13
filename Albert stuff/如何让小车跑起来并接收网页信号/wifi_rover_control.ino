@@ -24,26 +24,60 @@ WiFiWebServer server(80);
 // ==========================================
 // 3. 极简版网页前端 (队友写好后替换这里)
 // ==========================================
-const char webpage[] = \
-"<html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no\">" \
-"<style>.btn{padding:20px 40px; margin:10px; font-size:20px; font-weight:bold; background-color:#4CAF50; color:white; border:none; border-radius:10px; touch-action:manipulation;}</style></head>" \
-"<body style=\"text-align:center; background-color:#222; color:white; font-family:sans-serif; margin-top:50px;\">" \
-"<h2>Lunar Rover Control</h2>" \
-"<div>" \
-"<button class=\"btn\" onmousedown=\"sendCmd('/forward')\" onmouseup=\"sendCmd('/stop')\" ontouchstart=\"sendCmd('/forward')\" ontouchend=\"sendCmd('/stop')\">Forward</button><br>" \
-"<button class=\"btn\" onmousedown=\"sendCmd('/left')\" onmouseup=\"sendCmd('/stop')\" ontouchstart=\"sendCmd('/left')\" ontouchend=\"sendCmd('/stop')\">Left</button>" \
-"<button class=\"btn\" style=\"background-color:#f44336;\" onmousedown=\"sendCmd('/stop')\" ontouchstart=\"sendCmd('/stop')\">STOP</button>" \
-"<button class=\"btn\" onmousedown=\"sendCmd('/right')\" onmouseup=\"sendCmd('/stop')\" ontouchstart=\"sendCmd('/right')\" ontouchend=\"sendCmd('/stop')\">Right</button><br>" \
-"<button class=\"btn\" onmousedown=\"sendCmd('/backward')\" onmouseup=\"sendCmd('/stop')\" ontouchstart=\"sendCmd('/backward')\" ontouchend=\"sendCmd('/stop')\">Backward</button>" \
-"</div>" \
-"<script>" \
-"function sendCmd(cmd) { var xhttp = new XMLHttpRequest(); xhttp.open('GET', cmd, true); xhttp.send(); }" \
-"</script>" \
-"</body></html>";
+const char webpage[] = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <style>
+    body { font-family: sans-serif; text-align: center; background: #222; color: #fff; margin-top: 50px; user-select: none; -webkit-user-select: none; }
+    .grid { display: grid; grid-template-columns: repeat(3, 90px); grid-gap: 15px; justify-content: center; margin-top: 30px; }
+    .btn { width: 90px; height: 90px; font-size: 20px; font-weight: bold; border-radius: 15px; border: none; background: #4CAF50; color: white; touch-action: manipulation; }
+    .btn:active { background: #45a049; }
+    .stop { background: #f44336; }
+    .empty { background: transparent; }
+  </style>
+</head>
+<body>
+  <h2>Lunar Rover PRO</h2>
+  <div class="grid">
+    <div class="empty"></div>
+    <button class="btn" onmousedown="startMove('/forward')" onmouseup="stopMove()" ontouchstart="startMove('/forward')" ontouchend="stopMove()">FWD</button>
+    <div class="empty"></div>
+    <button class="btn" onmousedown="startMove('/left')" onmouseup="stopMove()" ontouchstart="startMove('/left')" ontouchend="stopMove()">LFT</button>
+    <button class="btn stop" onmousedown="stopMove()" ontouchstart="stopMove()">STOP</button>
+    <button class="btn" onmousedown="startMove('/right')" onmouseup="stopMove()" ontouchstart="startMove('/right')" ontouchend="stopMove()">RGT</button>
+    <div class="empty"></div>
+    <button class="btn" onmousedown="startMove('/backward')" onmouseup="stopMove()" ontouchstart="startMove('/backward')" ontouchend="stopMove()">BWD</button>
+    <div class="empty"></div>
+  </div>
+  <script>
+    var timer;
+    function sendCmd(cmd) {
+      var xhttp = new XMLHttpRequest();
+      xhttp.open('GET', cmd, true);
+      xhttp.send();
+    }
+    function startMove(cmd) {
+      sendCmd(cmd); // 立即发送第一次指令
+      clearInterval(timer);
+      timer = setInterval(function() { sendCmd(cmd); }, 200); // 随后每 200ms 发送一次心跳包防断联
+    }
+    function stopMove() {
+      clearInterval(timer);
+      sendCmd('/stop'); // 手指松开立刻发停车指令
+    }
+  </script>
+</body>
+</html>
+)rawliteral";
 
 // ==========================================
 // 4. 核心驱动函数 (Backend Logic)
 // ==========================================
+unsigned long lastCmdTime = 0;
+const unsigned long WATCHDOG_TIMEOUT = 500; // 500毫秒没收到任何信号，强制停车！
+
 void handleRoot() { server.send(200, "text/html", webpage); }
 
 // 队友写的神仙级控制函数：通过正负数自动判断方向
@@ -67,24 +101,28 @@ void stopBoth() {
 void moveForward() {
   setMotor(DIR_LEFT, EN_LEFT, SPEED);
   setMotor(DIR_RIGHT, EN_RIGHT, SPEED);
+  lastCmdTime = millis(); // 喂狗 (重置超时时间)
   server.send(200, "text/plain", "Moving Forward");
 }
 
 void moveBackward() {
   setMotor(DIR_LEFT, EN_LEFT, -SPEED);
   setMotor(DIR_RIGHT, EN_RIGHT, -SPEED);
+  lastCmdTime = millis(); // 喂狗
   server.send(200, "text/plain", "Moving Backward");
 }
 
 void turnLeft() {
   setMotor(DIR_LEFT, EN_LEFT, -SPEED);
   setMotor(DIR_RIGHT, EN_RIGHT, SPEED);
+  lastCmdTime = millis(); // 喂狗
   server.send(200, "text/plain", "Turning Left");
 }
 
 void turnRight() {
   setMotor(DIR_LEFT, EN_LEFT, SPEED);
   setMotor(DIR_RIGHT, EN_RIGHT, -SPEED);
+  lastCmdTime = millis(); // 喂狗
   server.send(200, "text/plain", "Turning Right");
 }
 
@@ -131,4 +169,9 @@ void setup() {
 
 void loop() {
   server.handleClient(); // 不断监听来自网页的点击信号
+  
+  // 终极防撞墙狗 (Watchdog) 逻辑
+  if (millis() - lastCmdTime > WATCHDOG_TIMEOUT) {
+    stopBoth(); // 超过 500ms 没收到指令，强制停车
+  }
 }

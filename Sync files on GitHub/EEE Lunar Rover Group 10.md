@@ -3,7 +3,7 @@
 | Group Members | Role |
 | :---- | :---- |
 | Mohammed Salem | Movement + User interface |
-| Albert Ma |  |
+| Albert Ma | Logbook Management + Movement + User interface |
 | Devesh Kemani | Magnetism Detection |
 | Christopher Koh | Project Manager + Infrared Detection  |
 | Wangmo Koo | Ultrasonic Detection + Parts IC |

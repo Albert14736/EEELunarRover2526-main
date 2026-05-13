@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Rover UI Test</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; background: #222; color: #fff; margin-top: 50px; user-select: none; -webkit-user-select: none; }
+    .grid { display: grid; grid-template-columns: repeat(3, 90px); grid-gap: 15px; justify-content: center; margin-top: 30px; }
+    .btn { width: 90px; height: 90px; font-size: 20px; font-weight: bold; border-radius: 15px; border: none; background: #4CAF50; color: white; touch-action: manipulation; }
+    .btn:active { background: #45a049; }
+    .stop { background: #f44336; }
+    .empty { background: transparent; }
+    /* Local test version only: Status monitor */
+    #disclaimer { font-size: 12px; color: #aaa; border: 1px solid #444; padding: 10px; margin: 20px auto; max-width: 80%; border-radius: 5px; }
+    #status-box { margin-top: 40px; padding: 15px; background: #111; border-radius: 10px; width: 80%; max-width: 300px; margin-left: auto; margin-right: auto; font-family: monospace; color: #0f0; word-wrap: break-word;}
+  </style>
+</head>
+<body>
+  <h2>Lunar Rover PRO<br><span style="font-size: 14px; color: #aaa;">(Local UI Test Mode)</span></h2>
+  
+  <!-- Disclaimer for the team -->
+  <div id="disclaimer">
+    <strong>NOTE:</strong> This is a UI prototype for backend development. The final UI may look different. This file is to demonstrate the 'Hold-to-drive' and 'Watchdog Heartbeat' logic that I am implementing in the rover's C++ code.
+  </div>
+
+  <div class="grid">
+    <div class="empty"></div>
+    <button class="btn" onmousedown="startMove('/forward')" onmouseup="stopMove()" ontouchstart="startMove('/forward')" ontouchend="stopMove()">FWD</button>
+    <div class="empty"></div>
+    
+    <button class="btn" onmousedown="startMove('/left')" onmouseup="stopMove()" ontouchstart="startMove('/left')" ontouchend="stopMove()">LFT</button>
+    <button class="btn stop" onmousedown="stopMove()" ontouchstart="stopMove()">STOP</button>
+    <button class="btn" onmousedown="startMove('/right')" onmouseup="stopMove()" ontouchstart="startMove('/right')" ontouchend="stopMove()">RGT</button>
+    
+    <div class="empty"></div>
+    <button class="btn" onmousedown="startMove('/backward')" onmouseup="stopMove()" ontouchstart="startMove('/backward')" ontouchend="stopMove()">BWD</button>
+    <div class="empty"></div>
+  </div>
+
+  <!-- Local test version only: Display simulated commands -->
+  <div id="status-box">Status: Waiting for command...</div>
+
+  <script>
+    var timer;
+    var heartbeatCount = 0;
+    var statusBox = document.getElementById('status-box');
+
+    function sendCmd(cmd) {
+      // Intercepting actual XMLHttpRequest for local testing to print logs on screen
+      heartbeatCount++;
+      statusBox.innerHTML = "Signal: <strong style='color:#fff; font-size:18px;'>" + cmd + "</strong><br>Heartbeat Count: " + heartbeatCount;
+    }
+
+    function startMove(cmd) {
+      heartbeatCount = 0;
+      sendCmd(cmd); // Send first command immediately
+      clearInterval(timer);
+      timer = setInterval(function() { sendCmd(cmd); }, 200); // Send heartbeat every 200ms
+    }
+
+    function stopMove() {
+      clearInterval(timer);
+      sendCmd('/stop'); // Send stop command immediately on release
+    }
+  </script>
+</body>
+</html>
