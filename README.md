@@ -18,6 +18,8 @@ Quick links to our project planning and tracking documents.
 You can fill in the task by yourself, cause I'm just copying the format you use on Notion. I do not know exactly what are the use of these.
 
 
+- [Group 10 Master Doc (from Google Docs)](Sync%20files%20on%20GitHub/EEE%20Lunar%20Rover%20Group%2010.md) - **If you find it annoying to update multiple tracker files, just dump your progress, notes, or code snippets here!** I will review this document regularly and organize/distribute the information into the proper folders for us.
+- [Project Logbook / Diary](Sync%20files%20on%20GitHub/diary.md) - Our team's daily diary to record meetings and what we have achieved.
 - [Team Workspace Guide](Sync%20files%20on%20GitHub/README.md) - [To be filled]
 - [Demo](Sync%20files%20on%20GitHub/Projects/Demo.md) - [To be filled]
 - [Interim Presentation](Sync%20files%20on%20GitHub/Projects/Interim%20Presentation.md) - [To be filled]

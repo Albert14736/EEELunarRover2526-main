@@ -3,14 +3,14 @@
 #include <WiFiWebServer.h>
 
 // ==========================================
-// 1. 硬件引脚定义 (已根据上次的测试修正了左右轮)
+// 1. 硬件引脚定义 (完全采用队友测试成功的方案)
 // ==========================================
-const int LEFT_DIR = 4;
-const int LEFT_PWM = 6;
-const int RIGHT_DIR = 2;
-const int RIGHT_PWM = 3;
+const int DIR_LEFT  = 2;  // 根据队友文档建议：原12号与WiFi冲突，改为2
+const int EN_LEFT   = 3;  // 改为3
+const int DIR_RIGHT = 9;  // 队友测试成功的右轮
+const int EN_RIGHT  = 8;  // 队友测试成功的右轮
 
-const int SPEED = 150; // 测试速度 (0-255)
+const int SPEED = 200; // 队友测试的有效速度 (0-255)，足够克服摩擦力
 
 // ==========================================
 // 2. WiFi 配置
@@ -46,32 +46,50 @@ const char webpage[] = \
 // ==========================================
 void handleRoot() { server.send(200, "text/html", webpage); }
 
+// 队友写的神仙级控制函数：通过正负数自动判断方向
+void setMotor(int dirPin, int enPin, int speed) {  
+  if (speed >= 0) {  
+    digitalWrite(dirPin, HIGH);  
+    analogWrite(enPin, speed);  
+  } else {  
+    digitalWrite(dirPin, LOW);  
+    analogWrite(enPin, -speed);  
+  }  
+}
+
+void stopBoth() {  
+  setMotor(DIR_LEFT, EN_LEFT, 0);  
+  setMotor(DIR_RIGHT, EN_RIGHT, 0);  
+}
+
+// 注意：队友提到"ends connected the other way around"（线接反了）
+// 如果实际上车是往后开的，只要把下面的 SPEED 改成 -SPEED 即可！
 void moveForward() {
-  digitalWrite(LEFT_DIR, HIGH); digitalWrite(RIGHT_DIR, HIGH);
-  analogWrite(LEFT_PWM, SPEED); analogWrite(RIGHT_PWM, SPEED);
+  setMotor(DIR_LEFT, EN_LEFT, SPEED);
+  setMotor(DIR_RIGHT, EN_RIGHT, SPEED);
   server.send(200, "text/plain", "Moving Forward");
 }
 
 void moveBackward() {
-  digitalWrite(LEFT_DIR, LOW); digitalWrite(RIGHT_DIR, LOW);
-  analogWrite(LEFT_PWM, SPEED); analogWrite(RIGHT_PWM, SPEED);
+  setMotor(DIR_LEFT, EN_LEFT, -SPEED);
+  setMotor(DIR_RIGHT, EN_RIGHT, -SPEED);
   server.send(200, "text/plain", "Moving Backward");
 }
 
 void turnLeft() {
-  digitalWrite(LEFT_DIR, LOW); digitalWrite(RIGHT_DIR, HIGH);
-  analogWrite(LEFT_PWM, SPEED); analogWrite(RIGHT_PWM, SPEED);
+  setMotor(DIR_LEFT, EN_LEFT, -SPEED);
+  setMotor(DIR_RIGHT, EN_RIGHT, SPEED);
   server.send(200, "text/plain", "Turning Left");
 }
 
 void turnRight() {
-  digitalWrite(LEFT_DIR, HIGH); digitalWrite(RIGHT_DIR, LOW);
-  analogWrite(LEFT_PWM, SPEED); analogWrite(RIGHT_PWM, SPEED);
+  setMotor(DIR_LEFT, EN_LEFT, SPEED);
+  setMotor(DIR_RIGHT, EN_RIGHT, -SPEED);
   server.send(200, "text/plain", "Turning Right");
 }
 
 void stopRover() {
-  analogWrite(LEFT_PWM, 0); analogWrite(RIGHT_PWM, 0);
+  stopBoth();
   server.send(200, "text/plain", "Stopped");
 }
 
@@ -79,9 +97,9 @@ void stopRover() {
 // 5. 初始化与网络绑定
 // ==========================================
 void setup() {
-  pinMode(LEFT_DIR, OUTPUT); pinMode(LEFT_PWM, OUTPUT);
-  pinMode(RIGHT_DIR, OUTPUT); pinMode(RIGHT_PWM, OUTPUT);
-  stopRover(); // 上电先刹车
+  pinMode(DIR_LEFT, OUTPUT); pinMode(EN_LEFT, OUTPUT);
+  pinMode(DIR_RIGHT, OUTPUT); pinMode(EN_RIGHT, OUTPUT);
+  stopBoth(); // 上电先刹车
 
   Serial.begin(9600);
   // while (!Serial && millis() < 10000); // 可以注释掉以加快上电启动速度
