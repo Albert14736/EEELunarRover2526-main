@@ -9,12 +9,20 @@
     .grid { display: grid; grid-template-columns: repeat(3, 90px); grid-gap: 15px; justify-content: center; margin-top: 30px; }
     .btn { width: 90px; height: 90px; font-size: 28px; font-weight: bold; border-radius: 15px; border: none; background: #4CAF50; color: white; touch-action: manipulation; }
     .btn:active { background: #45a049; }
+    .btn.active-state { background: #45a049; }
     .stop { background: #f44336; }
     .empty { background: transparent; }
     /* Local test version only: Status monitor */
     #disclaimer { font-size: 12px; color: #aaa; border: 1px solid #444; padding: 10px; margin: 20px auto; max-width: 80%; border-radius: 5px; }
     #status-box { margin-top: 40px; padding: 15px; background: #111; border-radius: 10px; width: 80%; max-width: 300px; margin-left: auto; margin-right: auto; font-family: monospace; color: #0f0; word-wrap: break-word;}
-    #history-box { margin-top: 15px; padding: 15px; background: #1a1a1a; border-radius: 10px; width: 80%; max-width: 300px; margin-left: auto; margin-right: auto; font-family: monospace; color: #aaa; height: 120px; overflow-y: auto; text-align: left; box-sizing: border-box; }
+    #history-box { margin-top: 15px; padding: 15px; background: #1a1a1a; border-radius: 10px; width: 80%; max-width: 300px; margin-left: auto; margin-right: auto; font-family: monospace; color: #aaa; height: 120px; overflow-y: auto; text-align: left; box-sizing: border-box; position: relative; transition: all 0.3s ease; }
+    #history-box.expanded { position: fixed; top: 5%; left: 5%; right: 5%; bottom: 5%; width: 90%; height: 90%; max-width: none; z-index: 1000; font-size: 16px; box-shadow: 0 0 20px rgba(0,0,0,0.8); }
+    .expand-btn { position: absolute; top: 10px; right: 10px; background: #333; color: #fff; border: 1px solid #555; padding: 3px 8px; border-radius: 5px; cursor: pointer; font-size: 12px; }
+    /* Sensor Dashboard */
+    .dashboard { margin-top: 20px; padding: 15px; background: #111; border-radius: 10px; width: 80%; max-width: 300px; margin-left: auto; margin-right: auto; text-align: left; border: 1px solid #444; }
+    .dash-item { margin: 10px 0; font-size: 15px; display: flex; justify-content: space-between; border-bottom: 1px dashed #333; padding-bottom: 5px; }
+    .dash-label { color: #ccc; }
+    .dash-val { color: #f44336; font-family: monospace; font-size: 12px; }
   </style>
 </head>
 <body>
@@ -25,18 +33,29 @@
     <strong>NOTE:</strong> This is a UI prototype for backend development. The final UI may look different. This file is to demonstrate the 'Hold-to-drive' and 'Watchdog Heartbeat' logic that I am implementing in the rover's C++ code.
   </div>
 
+  <div id="connection-indicator" style="font-size:18px; font-weight:bold; color:#f44336; margin-bottom:15px;">❌ Disconnected</div>
+
   <div class="grid">
-    <div class="empty"></div>
-    <button class="btn" onmousedown="startMove('/forward')" onmouseup="stopMove()" ontouchstart="startMove('/forward')" ontouchend="stopMove()">&#9650;</button>
-    <div class="empty"></div>
+    <button id="btn-fl" class="btn" onmousedown="startMove('/forward_left')" onmouseup="stopMove()" ontouchstart="startMove('/forward_left')" ontouchend="stopMove()">&#8598;</button>
+    <button id="btn-fwd" class="btn" onmousedown="startMove('/forward')" onmouseup="stopMove()" ontouchstart="startMove('/forward')" ontouchend="stopMove()">&#9650;</button>
+    <button id="btn-fr" class="btn" onmousedown="startMove('/forward_right')" onmouseup="stopMove()" ontouchstart="startMove('/forward_right')" ontouchend="stopMove()">&#8599;</button>
     
-    <button class="btn" onmousedown="startMove('/left')" onmouseup="stopMove()" ontouchstart="startMove('/left')" ontouchend="stopMove()">&#9664;</button>
-    <button class="btn stop" onmousedown="stopMove()" ontouchstart="stopMove()">STOP</button>
-    <button class="btn" onmousedown="startMove('/right')" onmouseup="stopMove()" ontouchstart="startMove('/right')" ontouchend="stopMove()">&#9654;</button>
+    <button id="btn-lft" class="btn" onmousedown="startMove('/left')" onmouseup="stopMove()" ontouchstart="startMove('/left')" ontouchend="stopMove()">&#9664;</button>
+    <button id="btn-stp" class="btn stop" onmousedown="stopMove()" ontouchstart="stopMove()">STOP</button>
+    <button id="btn-rgt" class="btn" onmousedown="startMove('/right')" onmouseup="stopMove()" ontouchstart="startMove('/right')" ontouchend="stopMove()">&#9654;</button>
     
-    <div class="empty"></div>
-    <button class="btn" onmousedown="startMove('/backward')" onmouseup="stopMove()" ontouchstart="startMove('/backward')" ontouchend="stopMove()">&#9660;</button>
-    <div class="empty"></div>
+    <button id="btn-bl" class="btn" onmousedown="startMove('/backward_left')" onmouseup="stopMove()" ontouchstart="startMove('/backward_left')" ontouchend="stopMove()">&#8601;</button>
+    <button id="btn-bwd" class="btn" onmousedown="startMove('/backward')" onmouseup="stopMove()" ontouchstart="startMove('/backward')" ontouchend="stopMove()">&#9660;</button>
+    <button id="btn-br" class="btn" onmousedown="startMove('/backward_right')" onmouseup="stopMove()" ontouchstart="startMove('/backward_right')" ontouchend="stopMove()">&#8600;</button>
+  </div>
+
+  <!-- Sensor Dashboard -->
+  <div class="dashboard">
+    <div style="color: #fff; text-align: center; margin-bottom: 10px; font-weight: bold;">Sensor Dashboard</div>
+    <div class="dash-item"><span class="dash-label">📡 Radio (Age)</span> <span class="dash-val">Wait for Zifan...</span></div>
+    <div class="dash-item"><span class="dash-label">🔥 Infrared</span> <span class="dash-val">Wait for Chris...</span></div>
+    <div class="dash-item"><span class="dash-label">🦇 Ultrasound</span> <span class="dash-val">Wait for Wangmo...</span></div>
+    <div class="dash-item"><span class="dash-label">🧲 Magnetic</span> <span class="dash-val">Wait for Devesh...</span></div>
   </div>
 
   <!-- Local test version only: Display simulated commands -->
@@ -44,6 +63,7 @@
 
   <!-- Local test version only: Command History Log -->
   <div id="history-box">
+    <button class="expand-btn" onclick="toggleHistory()">Expand</button>
     <div style="color: #fff; border-bottom: 1px solid #444; padding-bottom: 5px; margin-bottom: 5px; text-align: center;">Command History</div>
     <div id="history-content"></div>
   </div>
@@ -62,6 +82,10 @@
       if(cmd === '/backward') return 'Backward';
       if(cmd === '/left') return 'Left';
       if(cmd === '/right') return 'Right';
+      if(cmd === '/forward_left') return 'Forward Left';
+      if(cmd === '/forward_right') return 'Forward Right';
+      if(cmd === '/backward_left') return 'Backward Left';
+      if(cmd === '/backward_right') return 'Backward Right';
       return 'Stop';
     }
 
@@ -71,8 +95,21 @@
       statusBox.innerHTML = "Signal: <strong style='color:#fff; font-size:18px;'>" + cmd + "</strong><br>Heartbeat Count: " + heartbeatCount;
     }
 
+    function logCurrentAction() {
+      if (currentActionName !== "" && heartbeatCount > 0) {
+        // Log the aggregated action before resetting
+        var logEntry = document.createElement('div');
+        logEntry.innerHTML = "&gt; " + currentActionName + " <span style='color:#4CAF50;'>x" + heartbeatCount + "</span>";
+        historyContent.insertBefore(logEntry, historyContent.firstChild);
+      }
+    }
+
     function startMove(cmd) {
-      currentActionName = getActionName(cmd);
+      var newAction = getActionName(cmd);
+      if (currentActionName !== "" && currentActionName !== newAction) {
+        logCurrentAction();
+      }
+      currentActionName = newAction;
       heartbeatCount = 0;
       sendCmd(cmd); // Send first command immediately
       clearInterval(timer);
@@ -81,15 +118,73 @@
 
     function stopMove() {
       clearInterval(timer);
-      if (currentActionName !== "" && heartbeatCount > 0) {
-        // Log the aggregated action before resetting
-        var logEntry = document.createElement('div');
-        logEntry.innerHTML = "&gt; " + currentActionName + " <span style='color:#4CAF50;'>x" + heartbeatCount + "</span>";
-        historyContent.insertBefore(logEntry, historyContent.firstChild);
-      }
+      logCurrentAction();
       currentActionName = "";
       sendCmd('/stop'); // Send stop command immediately on release
     }
+
+    function toggleHistory() {
+      var box = document.getElementById('history-box');
+      var btn = box.querySelector('.expand-btn');
+      box.classList.toggle('expanded');
+      btn.innerHTML = box.classList.contains('expanded') ? 'Close' : 'Expand';
+    }
+
+    // Keyboard support (WASD and Arrows)
+    var keyState = { w:0, a:0, s:0, d:0, arrowup:0, arrowleft:0, arrowdown:0, arrowright:0 };
+    var activeCmd = "";
+    var pendingCmd = "";
+    var debounceTimer = null;
+
+    function highlightBtn(id, active) {
+      var btn = document.getElementById(id);
+      if (btn) { if (active) btn.classList.add('active-state'); else btn.classList.remove('active-state'); }
+    }
+
+    function processKeys() {
+      var fwd = keyState['w'] || keyState['arrowup'];
+      var bwd = keyState['s'] || keyState['arrowdown'];
+      var lft = keyState['a'] || keyState['arrowleft'];
+      var rgt = keyState['d'] || keyState['arrowright'];
+
+      // Cancel out contradictory inputs
+      if (fwd && bwd) { fwd = 0; bwd = 0; }
+      if (lft && rgt) { lft = 0; rgt = 0; }
+
+      var cmd = '/stop';
+      var activeBtn = null;
+
+      if (fwd && lft) { cmd = '/forward_left'; activeBtn = 'btn-fl'; }
+      else if (fwd && rgt) { cmd = '/forward_right'; activeBtn = 'btn-fr'; }
+      else if (bwd && lft) { cmd = '/backward_left'; activeBtn = 'btn-bl'; }
+      else if (bwd && rgt) { cmd = '/backward_right'; activeBtn = 'btn-br'; }
+      else if (fwd) { cmd = '/forward'; activeBtn = 'btn-fwd'; }
+      else if (bwd) { cmd = '/backward'; activeBtn = 'btn-bwd'; }
+      else if (lft) { cmd = '/left'; activeBtn = 'btn-lft'; }
+      else if (rgt) { cmd = '/right'; activeBtn = 'btn-rgt'; }
+
+      ['btn-fwd', 'btn-bwd', 'btn-lft', 'btn-rgt', 'btn-fl', 'btn-fr', 'btn-bl', 'btn-br'].forEach(function(id) {
+        highlightBtn(id, id === activeBtn);
+      });
+
+      if (cmd !== pendingCmd) {
+        pendingCmd = cmd;
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(function() {
+          activeCmd = pendingCmd;
+          if (activeCmd === '/stop') stopMove(); else startMove(activeCmd);
+        }, 60); // 60ms grace period to filter out human finger desync
+      }
+    }
+
+    document.addEventListener('keydown', function(e) {
+      var key = e.key.toLowerCase();
+      if (keyState[key] !== undefined) { if (!keyState[key]) { keyState[key] = 1; processKeys(); } e.preventDefault(); }
+    });
+    document.addEventListener('keyup', function(e) {
+      var key = e.key.toLowerCase();
+      if (keyState[key] !== undefined) { keyState[key] = 0; processKeys(); e.preventDefault(); }
+    });
   </script>
 </body>
 </html>
