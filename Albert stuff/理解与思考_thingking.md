@@ -104,8 +104,12 @@
 - [x] **Phase 0:** 项目需求理解与框架梳理 (Project brief understanding & architecture breakdown).
 - [ ] **Phase 1 (当前/Current):** 搭建基础底盘，建立 WiFi 网页服务器，实现小车的基础遥控与电机驱动 (Build basic chassis, host WiFi web server, and implement motor driving).
   - [x] 硬件连接与组装 (Hardware wiring & assembly)
-  - [ ] 基础编程与输出调试 (Basic programming & output debugging)
-- [ ] **Phase 2:** 待定 (TBD)
+  - [x] 基础编程与输出调试 (Basic programming & output debugging) - 基础电机测试成功！
+- [ ] **Phase 2: 核心遥控与传感器攻坚 (Remote Control & Sensor Development)**
+  - [ ] 将 WiFi 网页服务器与电机逻辑融合，实现手机端遥控 (Integrate WiFi web server with motor driving).
+  - [ ] 敲定并采购各模块核心元器件 (e.g., LM567芯片, 运放, 霍尔传感器)，填写在线采购单 (Online Order Form).
+  - [ ] 各子团队在面包板上独立验证三大传感器逻辑 (Breadboard testing for Radio, IR, Ultrasound).
+- [ ] **Phase 3: 软硬件大集成与整车调试 (Full Integration & Field Testing)**
 
 > 🗣️ **English Script (Read aloud / Show to team):**
 > "For our current progress, we are in Phase 1. Our goal is to build the basic chassis, host a simple web page using the WiFi shield, and get the motors running so the rover can drive."
@@ -115,8 +119,10 @@
 ## 8. 我的专属任务清单 (My Personal Task List)
 
 - [x] **任务 1: 硬件连接 (Hardware Wiring)** - 已完成！(Completed)
-- [ ] **任务 2: 基础编程与输出 (Basic Programming & Output)** - 正在进行中 (In Progress)
-  - 目标: 编写单片机基础代码，实现小车的基本控制逻辑和串口输出。
+- [x] **任务 2: 基础编程与输出 (Basic Programming & Output)** - 已完成！ (Completed)
+  - 目标: 编写单片机基础代码，实现小车的基本控制逻辑和串口输出。（通过 GitHub 远程部署，队友在实验室已测试跑通！）
+- [ ] **任务 3: WiFi 网页遥控开发 (WiFi Web Remote Control)** - 下一步核心重点 (Next Priority)
+  - 目标: 将 Adafruit 官方的 WebServer 代码与我们写好的电机驱动结合，做一个带“前后左右”按钮的网页控制面板。
 
 > 🗣️ **English Script (Read aloud / Show to team):**
 > "For my specific tasks, I have already finished the hardware wiring. My next step is to work on the basic programming and output for the microcontroller. I will be reviewing and writing the core control logic now."

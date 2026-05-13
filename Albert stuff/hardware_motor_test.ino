@@ -1,9 +1,9 @@
 // 1. Define Motor Pins (Safely avoiding WiFi reserved pins: 5, 7, 10)
 // 1. 定义电机引脚 (完美避开 WiFi 模块占用的 5, 7, 10 引脚)
-const int LEFT_DIR = 2;
-const int LEFT_PWM = 3;
-const int RIGHT_DIR = 4;
-const int RIGHT_PWM = 6;
+const int LEFT_DIR = 4;
+const int LEFT_PWM = 6;
+const int RIGHT_DIR = 2;
+const int RIGHT_PWM = 3;
 
 // Set testing speed (0-255). 
 // 150 is a stable speed to prevent the rover from flying off the desk!
