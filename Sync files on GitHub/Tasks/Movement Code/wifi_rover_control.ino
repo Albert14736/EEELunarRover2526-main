@@ -33,7 +33,7 @@ const char webpage[] = R"rawliteral(
   <style>
     body { font-family: sans-serif; text-align: center; background: #222; color: #fff; margin-top: 50px; user-select: none; -webkit-user-select: none; }
     .grid { display: grid; grid-template-columns: repeat(3, 90px); grid-gap: 15px; justify-content: center; margin-top: 30px; }
-    .btn { width: 90px; height: 90px; font-size: 20px; font-weight: bold; border-radius: 15px; border: none; background: #4CAF50; color: white; touch-action: manipulation; }
+    .btn { width: 90px; height: 90px; font-size: 28px; font-weight: bold; border-radius: 15px; border: none; background: #4CAF50; color: white; touch-action: manipulation; }
     .btn:active { background: #45a049; }
     .stop { background: #f44336; }
     .empty { background: transparent; }
@@ -45,13 +45,13 @@ const char webpage[] = R"rawliteral(
   <h2>Lunar Rover PRO</h2>
   <div class="grid">
     <div class="empty"></div>
-    <button class="btn" onmousedown="startMove('/forward')" onmouseup="stopMove()" ontouchstart="startMove('/forward')" ontouchend="stopMove()">FWD</button>
+    <button class="btn" onmousedown="startMove('/forward')" onmouseup="stopMove()" ontouchstart="startMove('/forward')" ontouchend="stopMove()">&#9650;</button>
     <div class="empty"></div>
-    <button class="btn" onmousedown="startMove('/left')" onmouseup="stopMove()" ontouchstart="startMove('/left')" ontouchend="stopMove()">LFT</button>
+    <button class="btn" onmousedown="startMove('/left')" onmouseup="stopMove()" ontouchstart="startMove('/left')" ontouchend="stopMove()">&#9664;</button>
     <button class="btn stop" onmousedown="stopMove()" ontouchstart="stopMove()">STOP</button>
-    <button class="btn" onmousedown="startMove('/right')" onmouseup="stopMove()" ontouchstart="startMove('/right')" ontouchend="stopMove()">RGT</button>
+    <button class="btn" onmousedown="startMove('/right')" onmouseup="stopMove()" ontouchstart="startMove('/right')" ontouchend="stopMove()">&#9654;</button>
     <div class="empty"></div>
-    <button class="btn" onmousedown="startMove('/backward')" onmouseup="stopMove()" ontouchstart="startMove('/backward')" ontouchend="stopMove()">BWD</button>
+    <button class="btn" onmousedown="startMove('/backward')" onmouseup="stopMove()" ontouchstart="startMove('/backward')" ontouchend="stopMove()">&#9660;</button>
     <div class="empty"></div>
   </div>
 
