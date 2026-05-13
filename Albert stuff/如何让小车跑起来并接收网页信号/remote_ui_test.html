@@ -7,13 +7,14 @@
   <style>
     body { font-family: sans-serif; text-align: center; background: #222; color: #fff; margin-top: 50px; user-select: none; -webkit-user-select: none; }
     .grid { display: grid; grid-template-columns: repeat(3, 90px); grid-gap: 15px; justify-content: center; margin-top: 30px; }
-    .btn { width: 90px; height: 90px; font-size: 20px; font-weight: bold; border-radius: 15px; border: none; background: #4CAF50; color: white; touch-action: manipulation; }
+    .btn { width: 90px; height: 90px; font-size: 28px; font-weight: bold; border-radius: 15px; border: none; background: #4CAF50; color: white; touch-action: manipulation; }
     .btn:active { background: #45a049; }
     .stop { background: #f44336; }
     .empty { background: transparent; }
     /* Local test version only: Status monitor */
     #disclaimer { font-size: 12px; color: #aaa; border: 1px solid #444; padding: 10px; margin: 20px auto; max-width: 80%; border-radius: 5px; }
     #status-box { margin-top: 40px; padding: 15px; background: #111; border-radius: 10px; width: 80%; max-width: 300px; margin-left: auto; margin-right: auto; font-family: monospace; color: #0f0; word-wrap: break-word;}
+    #history-box { margin-top: 15px; padding: 15px; background: #1a1a1a; border-radius: 10px; width: 80%; max-width: 300px; margin-left: auto; margin-right: auto; font-family: monospace; color: #aaa; height: 120px; overflow-y: auto; text-align: left; box-sizing: border-box; }
   </style>
 </head>
 <body>
@@ -26,33 +27,52 @@
 
   <div class="grid">
     <div class="empty"></div>
-    <button class="btn" onmousedown="startMove('/forward')" onmouseup="stopMove()" ontouchstart="startMove('/forward')" ontouchend="stopMove()">FWD</button>
+    <button class="btn" onmousedown="startMove('/forward')" onmouseup="stopMove()" ontouchstart="startMove('/forward')" ontouchend="stopMove()">&#9650;</button>
     <div class="empty"></div>
     
-    <button class="btn" onmousedown="startMove('/left')" onmouseup="stopMove()" ontouchstart="startMove('/left')" ontouchend="stopMove()">LFT</button>
+    <button class="btn" onmousedown="startMove('/left')" onmouseup="stopMove()" ontouchstart="startMove('/left')" ontouchend="stopMove()">&#9664;</button>
     <button class="btn stop" onmousedown="stopMove()" ontouchstart="stopMove()">STOP</button>
-    <button class="btn" onmousedown="startMove('/right')" onmouseup="stopMove()" ontouchstart="startMove('/right')" ontouchend="stopMove()">RGT</button>
+    <button class="btn" onmousedown="startMove('/right')" onmouseup="stopMove()" ontouchstart="startMove('/right')" ontouchend="stopMove()">&#9654;</button>
     
     <div class="empty"></div>
-    <button class="btn" onmousedown="startMove('/backward')" onmouseup="stopMove()" ontouchstart="startMove('/backward')" ontouchend="stopMove()">BWD</button>
+    <button class="btn" onmousedown="startMove('/backward')" onmouseup="stopMove()" ontouchstart="startMove('/backward')" ontouchend="stopMove()">&#9660;</button>
     <div class="empty"></div>
   </div>
 
   <!-- Local test version only: Display simulated commands -->
   <div id="status-box">Status: Waiting for command...</div>
 
+  <!-- Local test version only: Command History Log -->
+  <div id="history-box">
+    <div style="color: #fff; border-bottom: 1px solid #444; padding-bottom: 5px; margin-bottom: 5px; text-align: center;">Command History</div>
+    <div id="history-content"></div>
+  </div>
+
   <script>
     var timer;
     var heartbeatCount = 0;
+    var currentActionName = "";
     var statusBox = document.getElementById('status-box');
+
+    var historyContent = document.getElementById('history-content');
+
+    // Helper function to map URL commands to readable names
+    function getActionName(cmd) {
+      if(cmd === '/forward') return 'Forward';
+      if(cmd === '/backward') return 'Backward';
+      if(cmd === '/left') return 'Left';
+      if(cmd === '/right') return 'Right';
+      return 'Stop';
+    }
 
     function sendCmd(cmd) {
       // Intercepting actual XMLHttpRequest for local testing to print logs on screen
-      heartbeatCount++;
+      if (cmd !== '/stop') heartbeatCount++;
       statusBox.innerHTML = "Signal: <strong style='color:#fff; font-size:18px;'>" + cmd + "</strong><br>Heartbeat Count: " + heartbeatCount;
     }
 
     function startMove(cmd) {
+      currentActionName = getActionName(cmd);
       heartbeatCount = 0;
       sendCmd(cmd); // Send first command immediately
       clearInterval(timer);
@@ -61,6 +81,13 @@
 
     function stopMove() {
       clearInterval(timer);
+      if (currentActionName !== "" && heartbeatCount > 0) {
+        // Log the aggregated action before resetting
+        var logEntry = document.createElement('div');
+        logEntry.innerHTML = "&gt; " + currentActionName + " <span style='color:#4CAF50;'>x" + heartbeatCount + "</span>";
+        historyContent.insertBefore(logEntry, historyContent.firstChild);
+      }
+      currentActionName = "";
       sendCmd('/stop'); // Send stop command immediately on release
     }
   </script>
