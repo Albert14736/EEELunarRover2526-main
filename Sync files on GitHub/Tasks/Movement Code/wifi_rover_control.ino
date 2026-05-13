@@ -51,6 +51,9 @@ const char webpage[] = R"rawliteral(
 </head>
 <body>
   <h2>Lunar Rover PRO</h2>
+  
+  <div id="connection-indicator" style="font-size:18px; font-weight:bold; color:#f44336; margin-bottom:15px;">❌ Disconnected</div>
+
   <div class="grid">
     <button id="btn-fl" class="btn" onmousedown="startMove('/forward_left')" onmouseup="stopMove()" ontouchstart="startMove('/forward_left')" ontouchend="stopMove()">&#8598;</button>
     <button id="btn-fwd" class="btn" onmousedown="startMove('/forward')" onmouseup="stopMove()" ontouchstart="startMove('/forward')" ontouchend="stopMove()">&#9650;</button>
@@ -319,7 +322,8 @@ void setup() {
     while (true);
   }
 
-  if (groupNumber) WiFi.config(IPAddress(192, 168, 0, groupNumber + 1));
+  // Always configure static IP (192.168.0.1 if groupNumber is 0)
+  WiFi.config(IPAddress(192, 168, 0, groupNumber + 1));
 
   Serial.print("Connecting to SSID: "); Serial.println(ssid);
   while (WiFi.begin(ssid, pass) != WL_CONNECTED) {

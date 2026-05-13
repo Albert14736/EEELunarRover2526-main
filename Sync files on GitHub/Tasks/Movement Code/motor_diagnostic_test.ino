@@ -1,7 +1,8 @@
-const int DIR_LEFT  = 12;  
-const int EN_LEFT   = 11;  
-const int DIR_RIGHT = 9;  
-const int EN_RIGHT  = 8;
+// Safe pins avoiding WiFi Shield conflict (5, 7, 10, 11, 12, 13)
+const int DIR_LEFT  = 2;  
+const int EN_LEFT   = 3;  
+const int DIR_RIGHT = 4;  
+const int EN_RIGHT  = 6;
 
 // Speed for tests (0-255). 200 is a good starting point - high enough  
 // to overcome stiction, low enough to be safe on the bench.  

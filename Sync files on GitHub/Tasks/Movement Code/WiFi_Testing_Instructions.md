@@ -9,18 +9,31 @@
 
 ---
 
+## Phase 0: Hardware Wiring (CRITICAL!)
+Because the WiFi Shield actively uses pins **5, 7, 10, 11, 12, and 13**, we MUST NOT plug any motor wires into them, or the WiFi will crash instantly.
+
+Please connect the motor driver (H-Bridge) to the Metro M0 board exactly as follows:
+- **Left Motor:**
+  - `DIR` (Blue wire)  -> **Pin 2**
+  - `EN`  (Orange wire)-> **Pin 3**
+- **Right Motor:**
+  - `DIR` (Blue wire)  -> **Pin 4**
+  - `EN`  (Orange wire)-> **Pin 6**
+
+⚠️ **COMMON GROUND WARNING:** Ensure that the GND pin on the motor driver board is physically connected to the GND pin on the Metro M0 board. If they don't share the same ground, the motors will not spin!
+
 ## Phase 1: Uploading the Code (The Brain)
 1. Connect the Adafruit Metro M0 board (with the WiFi shield attached) to the lab computer via USB.
 2. Open the `wifi_rover_control.ino` file in VS Code (PlatformIO) or Arduino IDE.
 3. Verify the WiFi credentials in the code:
    - `ssid`: `"EEERover"`
    - `pass`: `"exhibition"`
-   - `groupNumber`: `0` (This will attempt to set a static IP of `192.168.0.1`).
+   - `groupNumber`: `10` (Since you are Group 10, this sets your static IP to `192.168.0.11`).
 4. **Upload/Flash** the code to the Metro M0 board.
 5. Open the **Serial Monitor** (Baud rate: 9600). You should see:
    - `Connecting to SSID: EEERover`
    - `Connected!`
-   - `IP Address: 192.168.0.1` (Take note of this IP).
+   - `IP Address: 192.168.0.11` (Take note of this IP).
 
 ## Phase 2: Network Connection & Power Up
 1. Turn on the 6V battery pack on the rover to provide power to the H-Bridge motor drivers.
@@ -29,7 +42,7 @@
 
 ## Phase 3: Opening the Web UI
 1. Open a web browser (Chrome/Safari) on your phone.
-2. Type the IP address exactly as shown in the Serial Monitor (e.g., `http://192.168.0.1`) into the address bar and press Enter.
+2. Type the IP address exactly as shown in the Serial Monitor (e.g., `http://192.168.0.11`) into the address bar and press Enter.
 3. The "Lunar Rover PRO" control panel with the directional arrows (▲ ◀ ▶ ▼) should load on your screen.
 
 ### Alternative: Previewing the UI Remotely

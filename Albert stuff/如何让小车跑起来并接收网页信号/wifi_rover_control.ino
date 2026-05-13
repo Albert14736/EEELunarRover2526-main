@@ -3,12 +3,13 @@
 #include <WiFiWebServer.h>
 
 // ==========================================
-// 1. Hardware Pin Definitions
+// 1. Hardware Pin Definitions (CRITICAL: Avoiding WiFi Shield Pins!)
+// The WiFi shield uses pins 5, 7, 10, 11, 12, 13. Do NOT use them!
 // ==========================================
-const int DIR_LEFT  = 2;  // Changed from 12 to 2 to avoid WiFi conflict
-const int EN_LEFT   = 3;  // PWM pin for left motor
-const int DIR_RIGHT = 9;  // Right motor DIR
-const int EN_RIGHT  = 8;  // Right motor PWM
+const int DIR_LEFT  = 2;  // Blue wire (Left)
+const int EN_LEFT   = 3;  // Orange wire (Left PWM)
+const int DIR_RIGHT = 4;  // Blue wire (Right)
+const int EN_RIGHT  = 6;  // Orange wire (Right PWM)
 
 const int SPEED = 200; // Testing speed (0-255), high enough to overcome stiction
 
@@ -51,6 +52,9 @@ const char webpage[] = R"rawliteral(
 </head>
 <body>
   <h2>Lunar Rover PRO</h2>
+  
+  <div id="connection-indicator" style="font-size:18px; font-weight:bold; color:#f44336; margin-bottom:15px;">❌ Disconnected</div>
+
   <div class="grid">
     <button id="btn-fl" class="btn" onmousedown="startMove('/forward_left')" onmouseup="stopMove()" ontouchstart="startMove('/forward_left')" ontouchend="stopMove()">&#8598;</button>
     <button id="btn-fwd" class="btn" onmousedown="startMove('/forward')" onmouseup="stopMove()" ontouchstart="startMove('/forward')" ontouchend="stopMove()">&#9650;</button>
@@ -319,7 +323,8 @@ void setup() {
     while (true);
   }
 
-  if (groupNumber) WiFi.config(IPAddress(192, 168, 0, groupNumber + 1));
+  // Always configure static IP (192.168.0.1 if groupNumber is 0)
+  WiFi.config(IPAddress(192, 168, 0, groupNumber + 1));
 
   Serial.print("Connecting to SSID: "); Serial.println(ssid);
   while (WiFi.begin(ssid, pass) != WL_CONNECTED) {
