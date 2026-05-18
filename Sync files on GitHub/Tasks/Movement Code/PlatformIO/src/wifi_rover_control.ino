@@ -5,32 +5,31 @@
 // ==========================================
 // 1. Hardware Pin Definitions
 // ==========================================
-const int DIR_LEFT  = 2;  // Changed from 12 to 2 to avoid WiFi conflict
-const int EN_LEFT   = 3;  // PWM pin for left motor
-const int DIR_RIGHT = 9;  // Right motor DIR
-const int EN_RIGHT  = 8;  // Right motor PWM
+const int DIR_LEFT  = 2;  
+const int EN_LEFT   = 3;  
+const int DIR_RIGHT = 4;  // Pin 4 for DIR
+const int EN_RIGHT  = 6;  // Pin 6 for PWM
 
-const int SPEED = 200; // Testing speed (0-255), high enough to overcome stiction
+const int SPEED = 200; 
 
 // ==========================================
 // 2. WiFi Configuration
 // ==========================================
 const char ssid[] = "EEERover";
 const char pass[] = "exhibition";
-const int groupNumber = 10; // Set your group number to fix IP at 192.168.0.(groupNumber+1)
+const int groupNumber = 10; 
 
 WiFiWebServer server(80);
 
 // ==========================================
-// 3. Web UI Frontend 
+// 3. Web UI Frontend (Stored in Flash memory)
 // ==========================================
-const char webpage[] = R"rawliteral(
+const char webpage[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <title>Lunar Rover Control</title>
   <style>
     body { font-family: sans-serif; text-align: center; background: #222; color: #fff; margin-top: 50px; user-select: none; -webkit-user-select: none; }
     .grid { display: grid; grid-template-columns: repeat(3, 90px); grid-gap: 15px; justify-content: center; margin-top: 30px; }
@@ -43,7 +42,6 @@ const char webpage[] = R"rawliteral(
     #history-box { margin-top: 15px; padding: 15px; background: #1a1a1a; border-radius: 10px; width: 80%; max-width: 300px; margin-left: auto; margin-right: auto; font-family: monospace; color: #aaa; height: 120px; overflow-y: auto; text-align: left; box-sizing: border-box; position: relative; transition: all 0.3s ease; }
     #history-box.expanded { position: fixed; top: 5%; left: 5%; right: 5%; bottom: 5%; width: 90%; height: 90%; max-width: none; z-index: 1000; font-size: 16px; box-shadow: 0 0 20px rgba(0,0,0,0.8); }
     .expand-btn { position: absolute; top: 10px; right: 10px; background: #333; color: #fff; border: 1px solid #555; padding: 3px 8px; border-radius: 5px; cursor: pointer; font-size: 12px; }
-    /* Sensor Dashboard */
     .dashboard { margin-top: 20px; padding: 15px; background: #111; border-radius: 10px; width: 80%; max-width: 300px; margin-left: auto; margin-right: auto; text-align: left; border: 1px solid #444; }
     .dash-item { margin: 10px 0; font-size: 15px; display: flex; justify-content: space-between; border-bottom: 1px dashed #333; padding-bottom: 5px; }
     .dash-label { color: #ccc; }
@@ -51,10 +49,8 @@ const char webpage[] = R"rawliteral(
   </style>
 </head>
 <body oncontextmenu="return false;">
-  <h2>Lunar Rover PRO<br><span style="font-size: 14px; color: #4CAF50;">(Firmware Integrated V1)</span></h2>
-  
+  <h2>Lunar Rover PRO<br><span style="font-size: 14px; color: #4CAF50;">(Stable Build V2)</span></h2>
   <div id="connection-indicator" style="font-size:18px; font-weight:bold; color:#f44336; margin-bottom:15px;">❌ Disconnected</div>
-
   <div class="grid">
     <button id="btn-fl" class="btn" onmousedown="startMove('/forward_left')" onmouseup="stopMove()" ontouchstart="startMove('/forward_left')" ontouchend="stopMove()">&#8598;</button>
     <button id="btn-fwd" class="btn" onmousedown="startMove('/forward')" onmouseup="stopMove()" ontouchstart="startMove('/forward')" ontouchend="stopMove()">&#9650;</button>
@@ -66,8 +62,6 @@ const char webpage[] = R"rawliteral(
     <button id="btn-bwd" class="btn" onmousedown="startMove('/backward')" onmouseup="stopMove()" ontouchstart="startMove('/backward')" ontouchend="stopMove()">&#9660;</button>
     <button id="btn-br" class="btn" onmousedown="startMove('/backward_right')" onmouseup="stopMove()" ontouchstart="startMove('/backward_right')" ontouchend="stopMove()">&#8600;</button>
   </div>
-
-  <!-- Sensor Dashboard -->
   <div class="dashboard">
     <div style="color: #fff; text-align: center; margin-bottom: 10px; font-weight: bold;">Sensor Dashboard</div>
     <div class="dash-item"><span class="dash-label">📡 Radio (Age)</span> <span class="dash-val">Wait for Zifan...</span></div>
@@ -75,55 +69,38 @@ const char webpage[] = R"rawliteral(
     <div class="dash-item"><span class="dash-label">🦇 Ultrasound</span> <span class="dash-val">Wait for Wangmo...</span></div>
     <div class="dash-item"><span class="dash-label">🧲 Magnetic</span> <span class="dash-val">Wait for Devesh...</span></div>
   </div>
-
   <div id="status-box">Status: Ready to connect...</div>
   <div id="history-box">
     <button class="expand-btn" onclick="toggleHistory()">Expand</button>
     <div style="color: #fff; border-bottom: 1px solid #444; padding-bottom: 5px; margin-bottom: 5px; text-align: center;">Command History</div>
     <div id="history-content"></div>
   </div>
-
   <script>
-    var timer;
-    var heartbeatCount = 0;
-    var currentActionName = "";
+    var timer; var heartbeatCount = 0; var currentActionName = "";
     var statusBox = document.getElementById('status-box');
     var historyContent = document.getElementById('history-content');
-
     function getActionName(cmd) {
-      if(cmd === '/forward') return 'Forward';
-      if(cmd === '/backward') return 'Backward';
-      if(cmd === '/left') return 'Left';
-      if(cmd === '/right') return 'Right';
-      if(cmd === '/forward_left') return 'Forward Left';
-      if(cmd === '/forward_right') return 'Forward Right';
-      if(cmd === '/backward_left') return 'Backward Left';
-      if(cmd === '/backward_right') return 'Backward Right';
+      if(cmd === '/forward') return 'Forward'; if(cmd === '/backward') return 'Backward';
+      if(cmd === '/left') return 'Left'; if(cmd === '/right') return 'Right';
+      if(cmd === '/forward_left') return 'Forward Left'; if(cmd === '/forward_right') return 'Forward Right';
+      if(cmd === '/backward_left') return 'Backward Left'; if(cmd === '/backward_right') return 'Backward Right';
       return 'Stop';
     }
-
     function sendCmd(cmd) {
       if (cmd !== '/stop') heartbeatCount++;
-      statusBox.innerHTML = "Transmitting: <strong style='color:#fff; font-size:18px;'>" + cmd + "</strong><br>Packets Sent: " + heartbeatCount;
-
-      var xhttp = new XMLHttpRequest();
-      xhttp.open('GET', cmd, true);
-      try { xhttp.send(); } catch(e) {}
+      statusBox.innerHTML = "Signal: " + cmd + "<br>Packets: " + heartbeatCount;
+      var xhttp = new XMLHttpRequest(); xhttp.open('GET', cmd, true); xhttp.send();
     }
-
     setInterval(function() {
-      var pxhttp = new XMLHttpRequest();
-      pxhttp.open('GET', '/ping', true);
-      pxhttp.timeout = 500;
+      var pxhttp = new XMLHttpRequest(); pxhttp.open('GET', '/ping', true); pxhttp.timeout = 500;
       pxhttp.onload = function() {
         var ind = document.getElementById('connection-indicator');
         if (pxhttp.status === 200) { ind.style.color = '#4CAF50'; ind.innerHTML = '✅ Connected'; }
         else { ind.style.color = '#f44336'; ind.innerHTML = '❌ Disconnected'; }
       };
-      pxhttp.onerror = pxhttp.ontimeout = function() { document.getElementById('connection-indicator').innerHTML = '<span style="color:#f44336;">❌ Disconnected</span>'; };
-      try { pxhttp.send(); } catch(e) { document.getElementById('connection-indicator').innerHTML = '<span style="color:#f44336;">❌ Disconnected</span>'; }
+      pxhttp.onerror = pxhttp.ontimeout = function() { document.getElementById('connection-indicator').innerHTML = '❌ Disconnected'; };
+      pxhttp.send();
     }, 1000);
-
     function logCurrentAction() {
       if (currentActionName !== "" && heartbeatCount > 0) {
         var logEntry = document.createElement('div');
@@ -131,88 +108,27 @@ const char webpage[] = R"rawliteral(
         historyContent.insertBefore(logEntry, historyContent.firstChild);
       }
     }
-
     function startMove(cmd) {
       var newAction = getActionName(cmd);
-      if (currentActionName !== "" && currentActionName !== newAction) {
-        logCurrentAction();
-      }
-      currentActionName = newAction;
-      heartbeatCount = 0;
-      sendCmd(cmd); 
-      clearInterval(timer);
+      if (currentActionName !== "" && currentActionName !== newAction) logCurrentAction();
+      currentActionName = newAction; heartbeatCount = 0;
+      sendCmd(cmd); clearInterval(timer);
       timer = setInterval(function() { sendCmd(cmd); }, 200); 
     }
-
-    function stopMove() {
-      clearInterval(timer);
-      logCurrentAction();
-      currentActionName = "";
-      sendCmd('/stop'); 
-    }
-
-    function toggleHistory() {
-      var box = document.getElementById('history-box');
-      var btn = box.querySelector('.expand-btn');
-      box.classList.toggle('expanded');
-      btn.innerHTML = box.classList.contains('expanded') ? 'Close' : 'Expand';
-    }
-
-    // Keyboard support (WASD and Arrows)
+    function stopMove() { clearInterval(timer); logCurrentAction(); currentActionName = ""; sendCmd('/stop'); }
+    function toggleHistory() { var box = document.getElementById('history-box'); box.classList.toggle('expanded'); }
     var keyState = { w:0, a:0, s:0, d:0, arrowup:0, arrowleft:0, arrowdown:0, arrowright:0 };
-    var activeCmd = "";
-    var pendingCmd = "";
-    var debounceTimer = null;
-
-    function highlightBtn(id, active) {
-      var btn = document.getElementById(id);
-      if (btn) { if (active) btn.classList.add('active-state'); else btn.classList.remove('active-state'); }
-    }
-
     function processKeys() {
-      var fwd = keyState['w'] || keyState['arrowup'];
-      var bwd = keyState['s'] || keyState['arrowdown'];
-      var lft = keyState['a'] || keyState['arrowleft'];
-      var rgt = keyState['d'] || keyState['arrowright'];
-
-      // Cancel out contradictory inputs
-      if (fwd && bwd) { fwd = 0; bwd = 0; }
-      if (lft && rgt) { lft = 0; rgt = 0; }
-
+      var fwd = keyState['w'] || keyState['arrowup']; var bwd = keyState['s'] || keyState['arrowdown'];
+      var lft = keyState['a'] || keyState['arrowleft']; var rgt = keyState['d'] || keyState['arrowright'];
       var cmd = '/stop';
-      var activeBtn = null;
-
-      if (fwd && lft) { cmd = '/forward_left'; activeBtn = 'btn-fl'; }
-      else if (fwd && rgt) { cmd = '/forward_right'; activeBtn = 'btn-fr'; }
-      else if (bwd && lft) { cmd = '/backward_left'; activeBtn = 'btn-bl'; }
-      else if (bwd && rgt) { cmd = '/backward_right'; activeBtn = 'btn-br'; }
-      else if (fwd) { cmd = '/forward'; activeBtn = 'btn-fwd'; }
-      else if (bwd) { cmd = '/backward'; activeBtn = 'btn-bwd'; }
-      else if (lft) { cmd = '/left'; activeBtn = 'btn-lft'; }
-      else if (rgt) { cmd = '/right'; activeBtn = 'btn-rgt'; }
-
-      ['btn-fwd', 'btn-bwd', 'btn-lft', 'btn-rgt', 'btn-fl', 'btn-fr', 'btn-bl', 'btn-br'].forEach(function(id) {
-        highlightBtn(id, id === activeBtn);
-      });
-
-      if (cmd !== pendingCmd) {
-        pendingCmd = cmd;
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(function() {
-          activeCmd = pendingCmd;
-          if (activeCmd === '/stop') stopMove(); else startMove(activeCmd);
-        }, 60); // 60ms grace period to filter out human finger desync
-      }
+      if (fwd && lft) cmd = '/forward_left'; else if (fwd && rgt) cmd = '/forward_right';
+      else if (fwd) cmd = '/forward'; else if (bwd) cmd = '/backward';
+      else if (lft) cmd = '/left'; else if (rgt) cmd = '/right';
+      if (cmd === '/stop') stopMove(); else startMove(cmd);
     }
-
-    document.addEventListener('keydown', function(e) {
-      var key = e.key.toLowerCase();
-      if (keyState[key] !== undefined) { if (!keyState[key]) { keyState[key] = 1; processKeys(); } e.preventDefault(); }
-    });
-    document.addEventListener('keyup', function(e) {
-      var key = e.key.toLowerCase();
-      if (keyState[key] !== undefined) { keyState[key] = 0; processKeys(); e.preventDefault(); }
-    });
+    document.addEventListener('keydown', function(e) { var key = e.key.toLowerCase(); if (keyState[key] !== undefined && !keyState[key]) { keyState[key] = 1; processKeys(); e.preventDefault(); } });
+    document.addEventListener('keyup', function(e) { var key = e.key.toLowerCase(); if (keyState[key] !== undefined) { keyState[key] = 0; processKeys(); e.preventDefault(); } });
   </script>
 </body>
 </html>
@@ -222,56 +138,23 @@ const char webpage[] = R"rawliteral(
 // 4. Core Motor Functions (Backend Logic)
 // ==========================================
 unsigned long lastCmdTime = 0;
-const unsigned long WATCHDOG_TIMEOUT = 500; // Force stop if no signal is received for 500ms!
-
-void handleRoot() { 
-  // 0. 关键：告诉服务器我们要开启分块传输，否则浏览器收到 Content-Length: 0 就会直接断开
-  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
-
-  // 1. 发送 HTTP 响应头（传入空字符串，配合上面的 UNKNOWN 激活 Chunked 模式）
-  server.send(200, "text/html", "");
-
-  // 2. 将巨大的 8KB 网页切割成 1KB (1024 字节) 的小数据包发送，彻底解决 WiFi 芯片内存溢出
-  int totalLength = sizeof(webpage) - 1;
-  int bytesSent = 0;
-  const int CHUNK_SIZE = 1024;
-  char chunkBuffer[CHUNK_SIZE + 1];
-
-  while (bytesSent < totalLength) {
-    int currentChunkSize = totalLength - bytesSent;
-    if (currentChunkSize > CHUNK_SIZE) currentChunkSize = CHUNK_SIZE;
-
-    memcpy(chunkBuffer, webpage + bytesSent, currentChunkSize);
-    chunkBuffer[currentChunkSize] = '\0';
-
-    server.sendContent(chunkBuffer);
-
-    bytesSent += currentChunkSize;
-    delay(10); // 留出 10 毫秒让 WiFi 芯片把当前小包发射出去，防止缓冲区阻塞
-  }
-
-  // 3. 传入空字符串结束传输
-  server.sendContent("");
-}
-
-void handlePing() { server.send(200, "text/plain", "pong"); }
+const unsigned long WATCHDOG_TIMEOUT = 500; 
 
 void replyAPI(const String& msg) {
-  server.sendHeader("Access-Control-Allow-Origin", "*"); // 保留跨域头，双端都能控
-  server.send(200, "text/plain", msg);
+  server.sendHeader(F("Access-Control-Allow-Origin"), F("*")); 
+  server.send(200, F("text/plain"), msg);
 }
 
-// Motor control function using positive/negative values for direction
 void setMotor(int dirPin, int enPin, int speed) {  
   if (speed == 0) {
     digitalWrite(dirPin, LOW);
-    analogWrite(enPin, 0); // 彻底切断电机电源
+    analogWrite(enPin, 0); 
   } else if (speed > 0) {  
     digitalWrite(dirPin, HIGH);  
     analogWrite(enPin, speed);  
   } else {  
     digitalWrite(dirPin, LOW);  
-    analogWrite(enPin, -speed);  
+    analogWrite(enPin, -speed); 
   }  
 }
 
@@ -280,69 +163,71 @@ void stopBoth() {
   setMotor(DIR_RIGHT, EN_RIGHT, 0);  
 }
 
-// Note: Teammate mentioned "ends connected the other way around"
-// If the rover drives backward, just change SPEED to -SPEED below!
 void moveForward() {
   setMotor(DIR_LEFT, EN_LEFT, SPEED);
   setMotor(DIR_RIGHT, EN_RIGHT, SPEED);
-  lastCmdTime = millis(); // Feed the watchdog (Reset timeout)
-  replyAPI("Moving Forward");
+  lastCmdTime = millis(); 
+  replyAPI(F("Moving Forward"));
 }
 
 void moveBackward() {
-  setMotor(DIR_LEFT, EN_LEFT, -SPEED);
-  setMotor(DIR_RIGHT, EN_RIGHT, -SPEED);
-  lastCmdTime = millis(); // Feed the watchdog
-  replyAPI("Moving Backward");
+  stopBoth(); // 暂时禁用后退
+  lastCmdTime = millis(); 
+  replyAPI(F("Backward Disabled"));
 }
 
 void turnLeft() {
   setMotor(DIR_LEFT, EN_LEFT, -SPEED);
   setMotor(DIR_RIGHT, EN_RIGHT, SPEED);
-  lastCmdTime = millis(); // Feed the watchdog
-  replyAPI("Turning Left");
+  lastCmdTime = millis(); 
+  replyAPI(F("Turning Left"));
 }
 
 void turnRight() {
   setMotor(DIR_LEFT, EN_LEFT, SPEED);
   setMotor(DIR_RIGHT, EN_RIGHT, -SPEED);
-  lastCmdTime = millis(); // Feed the watchdog
-  replyAPI("Turning Right");
+  lastCmdTime = millis(); 
+  replyAPI(F("Turning Right"));
 }
 
-// --- New Combined Movement (Car-style Steering) ---
 void curveForwardLeft() {
-  setMotor(DIR_LEFT, EN_LEFT, (SPEED * 3) / 4); // 内侧轮速度提升至 75%，防止卡死
+  setMotor(DIR_LEFT, EN_LEFT, (SPEED * 3) / 4); 
   setMotor(DIR_RIGHT, EN_RIGHT, SPEED);   
   lastCmdTime = millis();
-  replyAPI("Curve Forward Left");
+  replyAPI(F("Curve Forward Left"));
 }
 
 void curveForwardRight() {
   setMotor(DIR_LEFT, EN_LEFT, SPEED);
   setMotor(DIR_RIGHT, EN_RIGHT, (SPEED * 3) / 4);
   lastCmdTime = millis();
-  replyAPI("Curve Forward Right");
-}
-
-void curveBackwardLeft() {
-  setMotor(DIR_LEFT, EN_LEFT, -(SPEED * 3) / 4);
-  setMotor(DIR_RIGHT, EN_RIGHT, -SPEED);
-  lastCmdTime = millis();
-  replyAPI("Curve Backward Left");
-}
-
-void curveBackwardRight() {
-  setMotor(DIR_LEFT, EN_LEFT, -SPEED);
-  setMotor(DIR_RIGHT, EN_RIGHT, -(SPEED * 3) / 4);
-  lastCmdTime = millis();
-  replyAPI("Curve Backward Right");
+  replyAPI(F("Curve Forward Right"));
 }
 
 void stopRover() {
   stopBoth();
-  replyAPI("Stopped");
+  replyAPI(F("Stopped"));
 }
+
+void handleRoot() { 
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  server.send(200, F("text/html"), "");
+  int totalLength = sizeof(webpage) - 1;
+  int bytesSent = 0;
+  const int CHUNK_SIZE = 1024;
+  char chunkBuffer[CHUNK_SIZE + 1];
+  while (bytesSent < totalLength) {
+    int currentChunkSize = (totalLength - bytesSent > CHUNK_SIZE) ? CHUNK_SIZE : totalLength - bytesSent;
+    memcpy_P(chunkBuffer, webpage + bytesSent, currentChunkSize);
+    chunkBuffer[currentChunkSize] = '\0';
+    server.sendContent(chunkBuffer);
+    bytesSent += currentChunkSize;
+    delay(10); 
+  }
+  server.sendContent("");
+}
+
+void handlePing() { server.send(200, F("text/plain"), F("pong")); }
 
 // ==========================================
 // 5. Initialization & Network Binding
@@ -350,27 +235,18 @@ void stopRover() {
 void setup() {
   pinMode(DIR_LEFT, OUTPUT); pinMode(EN_LEFT, OUTPUT);
   pinMode(DIR_RIGHT, OUTPUT); pinMode(EN_RIGHT, OUTPUT);
-  stopBoth(); // Brake on startup
+  stopBoth(); 
 
   Serial.begin(9600);
-  // while (!Serial && millis() < 10000); // Can be commented out to speed up startup
-
   if (WiFi.status() == WL_NO_SHIELD) {
-    Serial.println("WiFi shield not present");
     while (true);
   }
 
-  // Always configure static IP (192.168.0.1 if groupNumber is 0)
   WiFi.config(IPAddress(192, 168, 0, groupNumber + 1));
-
-  Serial.print("Connecting to SSID: "); Serial.println(ssid);
   while (WiFi.begin(ssid, pass) != WL_CONNECTED) {
-    delay(500); Serial.print('.');
+    delay(500);
   }
-  Serial.println("\nConnected!");
-  Serial.print("IP Address: "); Serial.println(WiFi.localIP());
 
-  // Routing
   server.on("/", handleRoot);
   server.on("/ping", handlePing);
   server.on("/forward", moveForward);
@@ -379,18 +255,14 @@ void setup() {
   server.on("/right", turnRight);
   server.on("/forward_left", curveForwardLeft);
   server.on("/forward_right", curveForwardRight);
-  server.on("/backward_left", curveBackwardLeft);
-  server.on("/backward_right", curveBackwardRight);
   server.on("/stop", stopRover);
   
   server.begin();
 }
 
 void loop() {
-  server.handleClient(); // Continuously listen for HTTP requests from the webpage
-  
-  // Ultimate Anti-Crash Watchdog Logic
+  server.handleClient(); 
   if (millis() - lastCmdTime > WATCHDOG_TIMEOUT) {
-    stopBoth(); // Force stop if no command received for > 500ms
+    stopBoth(); 
   }
 }
