@@ -1,108 +1,616 @@
-**EEE LUNAR ROVER GROUP 10**
+**<u>EEE LUNAR ROVER GROUP 10</u>**
 
-| Group Members | Role |
-| :---- | :---- |
-| Mohammed Salem | Movement + User interface |
-| Albert Ma | Logbook Management + Movement + User interface |
-| Devesh Kemani | Magnetism Detection |
-| Christopher Koh | Project Manager + Infrared Detection  |
-| Wangmo Koo | Ultrasonic Detection + Parts IC |
-| Ye Zifan | Age Detection |
+<table>
+<thead>
+<tr>
+<th>Group Members</th>
+<th style="text-align: left;">Role</th>
+</tr>
+<tr>
+<th style="text-align: left;">Mohammed Salem</th>
+<th rowspan="2" style="text-align: left;">Movement + User interface</th>
+</tr>
+<tr>
+<th style="text-align: left;">Albert Ma</th>
+</tr>
+<tr>
+<th style="text-align: left;">Devesh Kemani</th>
+<th style="text-align: left;">Magnetism Detection</th>
+</tr>
+<tr>
+<th style="text-align: left;">Christopher Koh</th>
+<th style="text-align: left;">Project Manager + Infrared Detection</th>
+</tr>
+<tr>
+<th style="text-align: left;">Wangmo Koo</th>
+<th style="text-align: left;">Ultrasonic Detection + Parts IC</th>
+</tr>
+<tr>
+<th style="text-align: left;">Ye Zifan</th>
+<th style="text-align: left;">Age Detection</th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
 
-**TIMELINE**
+**<u>TIMELINE</u>**
 
-28 May - Interim Presentation  
-11 June - Report + Reflection Form  
+28 May - Interim Presentation
+
+11 June - Report + Reflection Form
+
 16 June - Demo
 
-Componants to order
+Components to order
 
-| Item  | Cost (pounds) | Min quantity |
-| :---- | :---- | :---- |
-| SS49E hall sensor | <1 |  |
-|  |  |  |
-|  |  |  |
-|  |  |  |
-|  |  |  |
-|  |  |  |
+| Item              | Cost (pounds) | Min quantity |
+|-------------------|---------------|--------------|
+| SS49E hall sensor | \<1           |              |
+|                   |               |              |
+|                   |               |              |
+|                   |               |              |
+|                   |               |              |
+|                   |               |              |
 
-Steering  
+Steering
+
 Receiving signals:
 
-- Radio (age)  
-- Infrared  
-- Ultrasonic  
+- Radio (age)
+
+- Infrared
+
+- Ultrasonic
+
 - Magnetic
 
 Weight (max 750g)
 
 HARDWARE
 
-[https://www.keysight.com/used/gb/en/knowledge/guides/voltage-regulators](https://www.keysight.com/used/gb/en/knowledge/guides/voltage-regulators)
+[<u>https://www.keysight.com/used/gb/en/knowledge/guides/voltage-regulators</u>](https://www.keysight.com/used/gb/en/knowledge/guides/voltage-regulators)
 
-Sensing magnetic fields  
-Hardware: SS49E hall sensor  
-Pin 1 (VCC): Connect to 3.3V on your Metro board.  
-Pin 2 (GND): Connect to GND.  
+**Report writing tips**
+
+- See teams document
+
+- Ensure narrative flow of report
+
+- 
+
+**INTERIM PRESENTATION**
+
+<img src="Group10_assets/media/image5.png" style="width:6.26772in;height:4.02778in" />
+
+**MAGNETISM DETECTION (DEVESH)**
+
+<u>Sensing magnetic fields</u>
+
+Hardware: SS49E hall sensor
+
+Pin 1 (VCC): Connect to 3.3V on your Metro board.
+
+Pin 2 (GND): Connect to GND.
+
 Pin 3 (Output): Connect to an analog pin, like A0.
 
-Metro M0 converts the voltage into a number 0-1023  
-When no magneti near by - supply voltage = 1.65ishV and analogRead() will return a value near 512.  
-As a North pole approaches, the voltage rises toward 3.3V value moves toward 1023  
+Metro M0 converts the voltage into a number 0-1023 using the analogue to digital converter
+
+When no magneti near by - supply voltage = 1.65ishV and analogRead() will return a value near 512.
+
+As a North pole approaches, the voltage rises toward 3.3V value moves toward 1023
+
 As south pole approaches, the voltage drops toward 0V (value moves toward 0).
 
-Magnetic field strength is proportional to r^3 so might only detect small changes. If the signal is too weak use Opamp as a non-onverting amplifier. 
+Magnetic field strength is proportional to r^3 so might only detect small changes. If the signal is too weak use Opamp as a non-onverting amplifier. MCP6002 opamp and build on breadboard
 
-Sample code:  
-```cpp
-void setup() {  
-  Serial.begin(9600);  
+Sample code:
+
+void setup() {
+
+Serial.begin(9600);
+
 }
 
-void loop() {  
-  int sensorValue = analogRead(A0);  
-    
-  // 512 is the middle. We add a buffer of +/- 50 to avoid noise.  
-  if (sensorValue > 560) {  
-    Serial.println("Magnetic Field: UP (North)");  
-  } else if (sensorValue < 460) {  
-    Serial.println("Magnetic Field: DOWN (South)");  
-  } else {  
-    Serial.println("No strong magnetic field detected.");  
-  }  
-    
-  delay(200);  
-}  
-```
-How the robot can be controlled
+void loop() {
+
+int sensorValue = analogRead(A0);
+
+// 512 is the middle. We add a buffer of +/- 50 to avoid noise.
+
+if (sensorValue \> 560) {
+
+Serial.println("Magnetic Field: UP (North)");
+
+} else if (sensorValue \< 460) {
+
+Serial.println("Magnetic Field: DOWN (South)");
+
+} else {
+
+Serial.println("No strong magnetic field detected.");
+
+}
+
+delay(200);
+
+}
+
+- The motors or whatever else may create a magnetic field o their own so in the setup we need to account for that and records that value - 0 it out.
+
+- Need to also account for rolling average, eg if value rises from 510 to 512 it doesnt necessarily mean we are moving closer to a rock. Therefore we should use a rolling average (eg the value of the reading is the average of the last 4 ‘snapshots’). Can achieve this simply with an array
+
+- Need to account for other rocks magnetism in the code but i dont know how strong the other rocks magnetism will be
+
+- 
+
+Positioning:
+
+- Point face (side with writing) down and point forward (closest to rock)
+
+- Positing furthest away from motors
+
+- 3D print a mount that can connect to the pins
+
+**MOVEMENT (ALBERT)**
+
+<u>How the robot can be controlled</u>
 
 We should manually control the robot so that it can move towards the rock and gather sensor readings.
 
-We can’t use the pins 5, 7, 10 since they are used by the WifiShield.  
-\[Reference to README file :   
-The I/O pins pass through the WiFi Shield when it is connected, but the pins labelled CS, IRQ and RST on the WiFi Shield (Arduino pins 5,7 and 10\) are used by WiFi and can't be used for other purposes. \]
+We can’t use the pins 5, 7, 10 since they are used by the WifiShield.
 
-Therefore we should use other pins to control the motor.  
-THerefore we should use: 
+\[Reference to README file :
 
-- Right : EN(8), DIR(9)  
+<span class="mark">The I/O pins pass through the WiFi Shield when it is connected, but the pins labelled CS, IRQ and RST on the WiFi Shield (Arduino pins 5,7 and 10) are used by WiFi and can't be used for other purposes.</span> \]
+
+Therefore we should use other pins to control the motor.
+
+THerefore we should use:
+
+- Right : EN(8), DIR(9)
+
 - Left : EN(11), DIR(12)
 
-ENABLE wires are coloured orange  
+ENABLE wires are coloured orange
+
 DIRECTION wires are coloured blue.
 
-13/05  
-Connected PCB to Metro board and uploaded the code `motor_move_v1` to test if the motors are connected properly.  
-*(Code `motor_move_v1` removed. It was a failed test.)*
+<u>13/05</u>
+
+Connected PCB to Metro board and uploaded the code motor_move_v1 to test if the motors are connected properly.
+
+\`\`\`v1
+
+const int DIR_LEFT = 12, EN_LEFT = 11, DIR_RIGHT = 9, EN_RIGHT = 8;
+
+void setup() {
+
+Serial.begin(9600);
+
+pinMode(DIR_LEFT, OUTPUT); pinMode(EN_LEFT, OUTPUT);
+
+pinMode(DIR_RIGHT, OUTPUT); pinMode(EN_RIGHT, OUTPUT);
+
+digitalWrite(DIR_LEFT, LOW); digitalWrite(EN_LEFT, LOW);
+
+digitalWrite(DIR_RIGHT, LOW); digitalWrite(EN_RIGHT, LOW);
+
+}
+
+void loop() {}
+
+\`\`\`
 
 Test failed motors did not move, DC voltage 6.21 around battery terminal and 0.125A measured current through battery.
 
-I found a wire that had not been placed properly (5V wire connecting board and PCB) fixed the issue and ran the code again.  
-Rewrote the code as well.  
-RESULT : LEFT motor was working fine but the right motor was not operating  
+I found a wire that had not been placed properly (5V wire connecting board and PCB) fixed the issue and ran the code again.
+
+Rewrote the code as well.
+
+RESULT : LEFT motor was working fine but the right motor was not operating
+
 The issue is that the motor on the right side works, however the pin12 is contested with the signal from the wifi module therefore we will use other pins to deliver the data. Suggested pins : DIR_LEFT = 2, EN_LEFT = 3
 
-**Rewritten code:** *(Extracted to `Tasks/Movement Code/motor_diagnostic_test.ino`)*
+Rewritten code:\
+const int DIR_LEFT = 12;
 
-The robot has its ends connected in the other way around.  
+const int EN_LEFT = 11;
+
+const int DIR_RIGHT = 9;
+
+const int EN_RIGHT = 8;
+
+// Speed for tests (0-255). 200 is a good starting point - high enough
+
+// to overcome stiction, low enough to be safe on the bench.
+
+const int TEST_SPEED = 200;
+
+void setMotor(int dirPin, int enPin, int speed) {
+
+// speed: -255 to +255. Positive = forward, negative = reverse, 0 = stop.
+
+if (speed \>= 0) {
+
+digitalWrite(dirPin, HIGH);
+
+analogWrite(enPin, speed);
+
+} else {
+
+digitalWrite(dirPin, LOW);
+
+analogWrite(enPin, -speed);
+
+}
+
+}
+
+void stopBoth() {
+
+setMotor(DIR_LEFT, EN_LEFT, 0);
+
+setMotor(DIR_RIGHT, EN_RIGHT, 0);
+
+}
+
+void setup() {
+
+Serial.begin(9600);
+
+while (!Serial && millis() \< 3000) { ; } // wait briefly for serial monitor
+
+pinMode(DIR_LEFT, OUTPUT);
+
+pinMode(EN_LEFT, OUTPUT);
+
+pinMode(DIR_RIGHT, OUTPUT);
+
+pinMode(EN_RIGHT, OUTPUT);
+
+stopBoth();
+
+Serial.println("Motor diagnostic - no WiFi");
+
+Serial.println("Watch each motor in turn.");
+
+delay(1000);
+
+}
+
+void loop() {
+
+// --- Right motor alone ---
+
+Serial.println("RIGHT motor: forward");
+
+setMotor(DIR_RIGHT, EN_RIGHT, TEST_SPEED);
+
+delay(2000);
+
+Serial.println("RIGHT motor: stop");
+
+setMotor(DIR_RIGHT, EN_RIGHT, 0);
+
+delay(1000);
+
+Serial.println("RIGHT motor: reverse");
+
+setMotor(DIR_RIGHT, EN_RIGHT, -TEST_SPEED);
+
+delay(2000);
+
+Serial.println("RIGHT motor: stop");
+
+setMotor(DIR_RIGHT, EN_RIGHT, 0);
+
+delay(1500);
+
+// --- Left motor alone ---
+
+Serial.println("LEFT motor: forward");
+
+setMotor(DIR_LEFT, EN_LEFT, TEST_SPEED);
+
+delay(2000);
+
+Serial.println("LEFT motor: stop");
+
+setMotor(DIR_LEFT, EN_LEFT, 0);
+
+delay(1000);
+
+Serial.println("LEFT motor: reverse");
+
+setMotor(DIR_LEFT, EN_LEFT, -TEST_SPEED);
+
+delay(2000);
+
+Serial.println("LEFT motor: stop");
+
+setMotor(DIR_LEFT, EN_LEFT, 0);
+
+delay(1500);
+
+// --- Both motors together ---
+
+Serial.println("BOTH motors: forward");
+
+setMotor(DIR_LEFT, EN_LEFT, TEST_SPEED);
+
+setMotor(DIR_RIGHT, EN_RIGHT, TEST_SPEED);
+
+delay(2000);
+
+Serial.println("BOTH motors: stop");
+
+stopBoth();
+
+delay(2000);
+
+}
+
+The robot has its ends connected in the other way around.
+
 We can fix this by the software or just connecting the wires to different parts around.
+
+**AGE DETECTION (MOHAMMED + ZIFAN)**
+
+**USER INTERFACE (MOHAMMED + ALBERT)**
+
+**ULTRASONIC DETECTION (HARRY)**
+
+**INFRARED DETECTION (CHRIS)**
+
+**<u>BACKGROUND</u>**
+
+The types of a rock is indicated by an infrared signal pulse rate with a Poisson distribution, ultrasonic signal and magnetic fields. For infrared signal, you have already made a light sensor as part of the EEEBug and most <span class="mark">silicon-based photosensors</span> (such as the EEEBug phototransistor) are just as sensitive to infrared as visible light. You will need to measure the infrared pulses rate and this can be done with <span class="mark">analogue or digital methods</span>.
+
+The optical power given by the rock is weaker than the light source you used for the EEEBug so you may need to amplify the output. Ambient light will cause interference and this can be <span class="mark">filtered out by using a sensor that is only sensiteamstive to the wavelength of the rock emission (950nm) and by using electronic filters</span>. Many sources of electric light have a strong frequency component at 100Hz due to the rectification effect of the 50Hz AC source.
+
+The infrared <span class="mark">pulse rate</span> is approximately λ=547 s-1 or λ=312 s-1 depending on the type of a rock. The <span class="mark">pulse width</span> of the infrared signal is just <span class="mark">50μs</span> and the <span class="mark">amplitude</span> that you observe <span class="mark">will be reduced if you filter out the high frequency harmonics</span>. <span class="mark">Low-pass filtering</span> may smooth out the edges of the pulse and <span class="mark">make pulse rate measurement less accurate</span>. There can even be a problem with the sensor itself, since all optical sensors have a capacitance that acts to introduce a low-pass filter. There may be a <span class="mark">trade-off between the speed and the sensitivity of your sensor.</span>
+
+A recommended method for measuring random infrared pulse rates on a lab oscilloscope is described below.
+
+1.  View pulses on the oscilloscope with a 10ms timebase.
+
+2.  Add measurement for 'Count' (positive or negative pulse depending on signal).
+
+3.  Use the 'single' button to capture and count one screen of the signal. The oscilloscope shows 12 divisions at 10ms, so the measurement is the pulses counted in 120ms.
+
+4.  You can confirm that the count measurement matches the number of pulses visible on the screen, but you should use the 'Zoom' view to be able to distinguish closely spaced pulses.
+
+5.  Use the single button to make as many measurements as necessary to get a statistically significant result.
+
+6.  Measuring the infrared pulses rate on the oscilloscope
+
+<img src="Group10_assets/media/image2.png" style="width:4.8311in;height:3.93229in" />
+
+**<u>EEEBug Phototransistor</u>**
+
+A phototransistor acts like a <span class="mark">light-dependent current source</span>. It requires a <span class="mark">bias voltage to work and a load resistor in series</span> to convert the current into a voltage that can be measured by the ADC. Additionally, a <span class="mark">capacitor can be added to create a low-pass filter that will remove any high-frequency noise</span>.
+
+<img src="Group10_assets/media/image4.png" style="width:6.26772in;height:3.51389in" />
+
+**<u>Design Log</u>**
+
+**14/05**
+
+Based on the background info + the EEE lab skills section on sensing, I ascertain that the key implement required to achieve infrared detection will involve a phototransistor.
+
+The phototransistor acts as a light dependent current source. Since phototransistors are similarly sensitive to infrared radiation as they are to the visible light spectrum, they can be implemented here to detect IR. I theorise that I can implement a phototransistor that will send bursts of current to the metro board upon receiving IR, which can then be interpreted using proper arduino code to determine the frequency of the IR.
+
+Some things to consider will be implementation of the filtering of ambient light, filtering of noise, while maintaining sensitivity and speed of the sensor.
+
+<table style="width:96%;">
+<colgroup>
+<col style="width: 96%" />
+</colgroup>
+<thead>
+<tr>
+<th>Current train of thought for implementation</th>
+</tr>
+<tr>
+<th><p>Receive signal -&gt; filter for 950nm -&gt; amplify -&gt; filter noise -&gt; interpret -&gt;</p>
+<p>return value</p></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+For now, the arduino code is superficial, I need to focus on how to implement the filtering and amplification for detection, before the interpretation stage. I realise there are two possible methods to achieve the detection:
+
+1.  Optical Filter -\> amplify
+
+- I can achieve this by attaching a physical filter to the phototransistor, using it to directly filter out light for wavelength 950nm.
+
+- Then amplify using an opamp of some kind
+
+> Advantages:
+
+- Prevents unwanted light from generating current at all
+
+<!-- -->
+
+- Reduces saturation from ambient light
+
+- Improves signal-to-noise ratio (SNR)
+
+- Keeps the amplifier from amplifying unwanted signals
+
+- Relatively simple implementation
+
+2.  Amplify -\> electronic filter
+
+Advantages
+
+- Small signals become easier to process
+
+- Active filters often require some gain anyway
+
+Disadvantages:
+
+- Noise and interference also get amplified
+
+- Large unwanted signals can overload the amplifier before filtering
+
+3.  Electronic filter -\> amplify
+
+Advantages:
+
+- Prevents out-of-band noise from entering the amplifier
+
+- Reduces risk of overload/saturation
+
+- Better dynamic range
+
+Disadvantages:
+
+- Passive filters may attenuate the desired signal too
+
+- If the signal is already tiny, filter losses can hurt SNR
+
+I note the demo conditions to determine what would be best. There is quite a lot of ambient light and the optical power given by the rock is weaker than the light source used for the sensing experiment (this was an iPhone torchlight). Hence, I determine that the best approach would be to combine method 1 and 2.
+
+Combining method 1 and 2 would filter the IR in two stages. First, using the optical filter, unwanted ambient light will be filtered out from the 950nm wavelength we want to detect. Then, amplification so that the small signal is magnified for proper detection (electronic filtering first could result in loss of signal). Finally, electronic filtering using a band-pass filter to allow the desired frequencies of 312 and 547 to be “selected”.
+
+**BREAK**
+
+I noted that I was wrong in identifying what to measure to identify the rock types. The rocks emit IR using a poisson distribution, which is not equivalent to frequency. The pulse rates of 312 and 547 are not constant across the time they are measured for. [<u>https://www.youtube.com/watch?v=jmqZG6roVqU</u>](https://www.youtube.com/watch?v=jmqZG6roVqU) I watched this video to remind myself of the poisson distribution and relevant calculations. I will revisit this when determining how to interpret the signal data from the phototransistor.
+
+I now determine what parts will be needed to start testing of my proposed detection method. I will need a phototransistor of course, followed by an opamp that can provide the gain and electronic filtering.
+
+When deciding what type of phototransistor to use, I must pay attention to the spectral response, the speed and the viewing angle. [<u>https://www.wevolver.com/article/photo-transistor-comprehensive-guide-for-modern-engineers</u>](https://www.wevolver.com/article/photo-transistor-comprehensive-guide-for-modern-engineers)
+
+<table style="width:96%;">
+<colgroup>
+<col style="width: 24%" />
+<col style="width: 71%" />
+</colgroup>
+<thead>
+<tr>
+<th>Spectral Response</th>
+<th>should be around 950nm (the wavelength of the IR from the rocks)</th>
+</tr>
+<tr>
+<th>Speed</th>
+<th><p>should be greater than the signal bandwidth to prevent pulse smearing which will affect the calculation of lambda.</p>
+<p>The pulse width of the IR pulses is related to the signal bandwidth. Pulse width (W) is the duration of a signal (t), while Bandwidth (BW) is the range of frequencies (Hz). For many applications, the bandwidth is the reciprocal of the pulse width: (BW =1/W).</p>
+<p>The pulse width is 50microseconds which gives a bandwidth of 20kHz.</p></th>
+</tr>
+<tr>
+<th>Viewing angle</th>
+<th>should be narrower to reduce noise that is picked up and enable a more directed detection method (benefit: start counting from earlier time when moving towards rock, improve lambda calculation. Con: must be pointed towards target)</th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+What is available in EEEstores:
+
+| SD0127 | PHOTOTRANSISTOR 5mm,HALF ANGLE 50° | £0.35 |
+|--------|------------------------------------|-------|
+
+When deciding the type of opamp to use, I must pay attention to the gain-bandwidth product and the slew rate and the operating voltage.
+
+<table style="width:96%;">
+<colgroup>
+<col style="width: 23%" />
+<col style="width: 72%" />
+</colgroup>
+<thead>
+<tr>
+<th>GBP</th>
+<th>Frequency at which gain becomes 1. Must make sure that the GBP of the chosen opamp is not at the detection frequency range otherwise will not be able to amplify the signal much for proper interpretation</th>
+</tr>
+<tr>
+<th>Slew rate</th>
+<th><p>The slew rate of an operational amplifier is the maximum rate of change of its output voltage. This will limit the speed of amplification.</p>
+<p>The pulsewidth is 50microseconds, which means that for optimised processing speed, the opamp slew rate must be equal to or higher than 50microseconds so it can respond quickly to the rise and falls in IR signal due to the short pulses.</p>
+<p><img src="Group10_assets/media/image3.png" style="width:3.1369in;height:2.60938in" /></p>
+<p>The LT1366 opamp has a slew rate of 0.13V/us which is very low and unideal for this detection</p></th>
+</tr>
+<tr>
+<th>Operating voltage</th>
+<th>The voltage required to drive the opamp. The metro board has built in 5V and 3.3V regulators. The chosen opamp must be able to operate at either of these voltages or a combination of the two.</th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+**BREAK**
+
+The last step of my research progress for today is to determine suitable candidates for the phototransistor and opamp parts to be ordered for testing next monday.
+
+First, I determine pulse width, pulse rate and required timing accuracy. Then I choose a detector with sufficient bandwidth, then an amplifier bandwidth somewhat above detector bandwidth. Choose GBP from: required gain × required bandwidth
+
+Using a 940nm peak wavelength phototransistor to detect a 950nm IR source is highly effective and widely considered a standard pairing. Because phototransistors have a broad spectral response, they maintain nearly full sensitivity within a few dozen nanometers of their peak. \[[<u>1</u>](https://uk.farnell.com/kingbright/l-53p3c/phototransistor-5mm-940nm/dp/2290444), [<u>2</u>](https://grobotronics.com/led-5mm-950nm-100mw.html?sl=en&srsltid=AfmBOorvawFirq3pNtxlpQzg2K08gzR1iaZQSdhpplrArb0X0NPYuHEL), [<u>3</u>](https://www.researchgate.net/publication/311624207_High-Performance_Near-Infrared_Phototransistor_Based_on_n-Type_Small-Molecular_Organic_Semiconductor), [<u>4</u>](https://botland.store/blog/phototransistor-what-is-it-and-what-is-it-used-for/)\]
+
+Performance & Compatibility
+
+- High Sensitivity: Most 940nm phototransistors are designed to be "spectrally matched" to emitters ranging from 870nm to 950nm.
+
+- Minimal Efficiency Loss: While you aren't hitting the absolute peak (940nm), the drop in sensitivity at 950nm is typically negligible (often less than 5–10%), as the response curve for silicon-based sensors is relatively flat at these near-infrared wavelengths.
+
+- Broad Bandwidth: A typical 940nm phototransistor can actually detect light across a massive range, often from 400nm to 1100nm. Manufacturers specify 940nm as the peak simply to indicate where it is most efficient. \[[<u>1</u>](https://uk.farnell.com/vishay/vemt3700f-gs08/photo-transistor-npn-940nm-plcc/dp/2504153), [<u>2</u>](https://www.futurlec.com/LED/INFD5940TRANS.shtml), [<u>3</u>](https://electronics.stackexchange.com/questions/478121/will-a-950-nm-ir-emitter-work-with-a-870-nm-phototransistor), [<u>4</u>](https://johnloomis.org/ece445/topics/egginc/pt_char.html), [<u>5</u>](https://uk.farnell.com/kingbright/l-53p3c/phototransistor-5mm-940nm/dp/2290444)\]
+
+Practical Considerations
+
+- Daylight Filters: Many 940nm phototransistors (like the [<u>Vishay VEMT3700F</u>](https://uk.farnell.com/vishay/vemt3700f-gs08/photo-transistor-npn-940nm-plcc/dp/2504153)) come with a "daylight blocking" black lens. This filter is specifically designed to allow IR light between 870nm and 950nm to pass while blocking visible light, making it ideal for your 950nm source.
+
+I decided to end my research here. I will select a phototransistor with built in daylight blocking lens with appropriate remaining parameters and a corresponding opamp tomorrow
+
+**15/05**
+
+Continuing from my previous research, I began searching for an ideal phototransistor on Mouser. I found the following two transistors which could be ideal for detection.
+
+<img src="Group10_assets/media/image1.png" style="width:6.26772in;height:2.41667in" />
+
+| TEFT4300 | https://www.vishay.com/docs/81549/teft4300.pdf |
+|----------|------------------------------------------------|
+| BPV11F   | https://www.vishay.com/docs/81505/bpv11f.pdf   |
+
+The TEFT4300 and the BPV11F are two transistors that are suitable for this application. Both have a black lens coating that filters out visible light so I can pinpoint the wavelength of IR to be measured. Both spectral wavelength ranges and rise and fall times are adequate for detecting the 950nm 50-microsecond-width pulses. The key difference is the viewing angle. TEFT4300 is 30 while the BPV11F is 15. The BPV11F smaller viewing angle can further minimise ambient noise and distortion. It might be worth it to purchase both and test both.
+
+As for the opamp, I choose one based on GBP and slew rate. Slew rate should be at least 5V/us to be safe. As for GBP, I have to determine that based on the gain I want to implement for the signal detection. I will go into the lab and test the detection method with the existing phototransistor and LT1366 to see the pulses before determining the desired gain. A key concern is managing the circuit package size.
+
+**BREAK**
+
+I now move onto testing the infrared detection method as proposed in the github. I replicated the phototransistor sensor setup detailed in the sensor lab skills section like so:
+
+<img src="Group10_assets/media/image8.png" style="width:5.45248in;height:3.07041in" />
+
+I configured the arduino code to run on the metro board and then ran a simulation using my torchlight to confirm that the detector works as per normal. I then used the rock simulator to perform a IR detection test.
+
+<img src="Group10_assets/media/image6.png" style="width:4.72396in;height:2.66017in" />
+
+<img src="Group10_assets/media/image9.png" style="width:2.00139in;height:3.55729in" />
+
+I couldn’t obtain any noticeable pulses on the oscilloscope or the serial monitor when testing with the rock simulator, even though the phototransistor was sensitive to light. I realised that the capacitor in parallel might be affecting the detection of pulses as capacitors act as filters. I then removed the capacitor and found that the pulses were now being detected as spikes on the oscilloscope and large value jumps on the serial monitor.
+
+<img src="Group10_assets/media/image10.png" style="width:6.26772in;height:3.52778in" />
+
+I note that the signal is detected when the diode points at roughly mid level to the internal PCB of the rock simulator. Upon covering the internal PCB with the rock case, I observed that the pulses had dropped significantly. I could only see very small pulses, as shown below:
+
+<img src="Group10_assets/media/image7.png" style="width:5.27604in;height:2.97106in" />
+
+<img src="Group10_assets/media/image11.png" style="width:5.41146in;height:3.04732in" />
+
+With this in mind, I believe a gain of 10-20 would be sufficient to amplify the signal back to a readable value.
+
+After researching, the AD8032 is a suitable opamp for amplification use:
+
+[<u>https://www.mouser.co.uk/datasheet/3/1014/1/AD8031_8032.pdf</u>](https://www.mouser.co.uk/datasheet/3/1014/1/AD8031_8032.pdf)
+
+GBP is 80MHz, which when providing a gain of 20 results in a bandwidth of 4MHz, plenty of bandwidth to spare when the cutoff frequency of the detector diode is only around 110kHz. Gives leeway for higher magnitude gain if needed.
+
+Slew rate is 30V/us which far exceeds the pulse width, will be able to respond quickly.
+
+Can operate from 2.7 to 12V, suitable range as access to 3.3V and 5V voltage nodes.
+
+Is also dual channel, can be used for amplification of other detection circuits so as to maximise breadboard space efficiency.
