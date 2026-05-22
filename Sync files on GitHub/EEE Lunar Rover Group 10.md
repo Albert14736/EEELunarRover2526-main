@@ -4,30 +4,30 @@
 <thead>
 <tr>
 <th>Group Members</th>
-<th style="text-align: left;">Role</th>
+<th>Role</th>
 </tr>
 <tr>
-<th style="text-align: left;">Mohammed Salem</th>
-<th rowspan="2" style="text-align: left;">Movement + User interface</th>
+<th>Mohammed Salem</th>
+<th rowspan="2">Movement + User interface</th>
 </tr>
 <tr>
-<th style="text-align: left;">Albert Ma</th>
+<th>Albert Ma</th>
 </tr>
 <tr>
-<th style="text-align: left;">Devesh Kemani</th>
-<th style="text-align: left;">Magnetism Detection</th>
+<th>Devesh Kemani</th>
+<th>Magnetism Detection</th>
 </tr>
 <tr>
-<th style="text-align: left;">Christopher Koh</th>
-<th style="text-align: left;">Project Manager + Infrared Detection</th>
+<th>Christopher Koh</th>
+<th>Project Manager + Infrared Detection</th>
 </tr>
 <tr>
-<th style="text-align: left;">Wangmo Koo</th>
-<th style="text-align: left;">Ultrasonic Detection + Parts IC</th>
+<th>Wangmo Koo</th>
+<th>Ultrasonic Detection + Parts IC</th>
 </tr>
 <tr>
-<th style="text-align: left;">Ye Zifan</th>
-<th style="text-align: left;">Age Detection</th>
+<th>Ye Zifan</th>
+<th>Age Detection</th>
 </tr>
 </thead>
 <tbody>
@@ -81,7 +81,7 @@ HARDWARE
 
 **INTERIM PRESENTATION**
 
-<img src="Group10_assets/media/image5.png" style="width:6.26772in;height:4.02778in" />
+<img src="Group10_assets/media/image7.png" style="width:6.26772in;height:4.02778in" />
 
 **MAGNETISM DETECTION (DEVESH)**
 
@@ -531,7 +531,7 @@ When deciding the type of opamp to use, I must pay attention to the gain-bandwid
 <th>Slew rate</th>
 <th><p>The slew rate of an operational amplifier is the maximum rate of change of its output voltage. This will limit the speed of amplification.</p>
 <p>The pulsewidth is 50microseconds, which means that for optimised processing speed, the opamp slew rate must be equal to or higher than 50microseconds so it can respond quickly to the rise and falls in IR signal due to the short pulses.</p>
-<p><img src="Group10_assets/media/image3.png" style="width:3.1369in;height:2.60938in" /></p>
+<p><img src="Group10_assets/media/image1.png" style="width:3.1369in;height:2.60938in" /></p>
 <p>The LT1366 opamp has a slew rate of 0.13V/us which is very low and unideal for this detection</p></th>
 </tr>
 <tr>
@@ -569,7 +569,7 @@ I decided to end my research here. I will select a phototransistor with built in
 
 Continuing from my previous research, I began searching for an ideal phototransistor on Mouser. I found the following two transistors which could be ideal for detection.
 
-<img src="Group10_assets/media/image1.png" style="width:6.26772in;height:2.41667in" />
+<img src="Group10_assets/media/image3.png" style="width:6.26772in;height:2.41667in" />
 
 | TEFT4300 | https://www.vishay.com/docs/81549/teft4300.pdf |
 |----------|------------------------------------------------|
@@ -587,19 +587,19 @@ I now move onto testing the infrared detection method as proposed in the github.
 
 I configured the arduino code to run on the metro board and then ran a simulation using my torchlight to confirm that the detector works as per normal. I then used the rock simulator to perform a IR detection test.
 
-<img src="Group10_assets/media/image6.png" style="width:4.72396in;height:2.66017in" />
+<img src="Group10_assets/media/image9.png" style="width:4.72396in;height:2.66017in" />
 
-<img src="Group10_assets/media/image9.png" style="width:2.00139in;height:3.55729in" />
+<img src="Group10_assets/media/image6.png" style="width:2.00139in;height:3.55729in" />
 
 I couldn’t obtain any noticeable pulses on the oscilloscope or the serial monitor when testing with the rock simulator, even though the phototransistor was sensitive to light. I realised that the capacitor in parallel might be affecting the detection of pulses as capacitors act as filters. I then removed the capacitor and found that the pulses were now being detected as spikes on the oscilloscope and large value jumps on the serial monitor.
 
-<img src="Group10_assets/media/image10.png" style="width:6.26772in;height:3.52778in" />
+<img src="Group10_assets/media/image11.png" style="width:6.26772in;height:3.52778in" />
 
 I note that the signal is detected when the diode points at roughly mid level to the internal PCB of the rock simulator. Upon covering the internal PCB with the rock case, I observed that the pulses had dropped significantly. I could only see very small pulses, as shown below:
 
-<img src="Group10_assets/media/image7.png" style="width:5.27604in;height:2.97106in" />
+<img src="Group10_assets/media/image5.png" style="width:5.27604in;height:2.97106in" />
 
-<img src="Group10_assets/media/image11.png" style="width:5.41146in;height:3.04732in" />
+<img src="Group10_assets/media/image10.png" style="width:5.41146in;height:3.04732in" />
 
 With this in mind, I believe a gain of 10-20 would be sufficient to amplify the signal back to a readable value.
 
@@ -614,3 +614,158 @@ Slew rate is 30V/us which far exceeds the pulse width, will be able to respond q
 Can operate from 2.7 to 12V, suitable range as access to 3.3V and 5V voltage nodes.
 
 Is also dual channel, can be used for amplification of other detection circuits so as to maximise breadboard space efficiency.
+
+Tab 2
+
+# Albert Ma — Movement & UI Logbook
+
+Personal work log for the Movement / Web UI module of the EEE Lunar Rover (Group 10).\
+Maintained here as a draft; the contents are periodically copy-pasted into the team's Google Doc.
+
+## Date: 13 May 2026
+
+### 👥 Team Organization & Task Allocation
+
+- First team meeting at the EE lab (10am, table near the demo area). Held an initial team introduction session.
+
+- Defined and allocated project roles across the team:
+
+  - Mohammed Salem + me: Arduino movement code + user interface
+
+  - Devesh Kemani: Magnetism detection
+
+  - Christopher Koh: Project Manager + Infrared detection
+
+  - Wangmo Koo: Ultrasonic detection + Parts IC
+
+  - Ye Zifan: Age detection
+
+### 🛠️ Hardware & Assembly Progress
+
+- Assembled the basic physical chassis of the EEE Lunar Rover.
+
+- Initial motor diagnostic surfaced two issues:
+
+  - One motor was running noticeably weaker than the other.
+
+  - **Left motor was wired into the right motor's pin on the PCB** (swapped at the PCB level) — flagged for follow-up; later worked around in software (see the 18 May setMotor() HIGH/LOW swap).
+
+- After bench fixes, confirmed the H-bridge driver and differential steering are functional.
+
+### 💻 Software & Project Management
+
+- Set up the team's **central GitHub repository** (Albert14736/EEELunarRover2526-main): created the base branch structure, defined the Sync files on GitHub/ workspace convention (so planning/progress files stay separated from individual code workspaces), wrote the root README, and added Chris, Mohammed, and Zifan as collaborators.
+
+- Standardised the team's docs on **Markdown** so progress, instructions, and embedded screenshots can live alongside the code.
+
+- Migrated existing project planning, schedules, and trackers from Notion into the repo so everything is in one version-controlled place.
+
+- Briefly evaluated **VS Code Live Share** as a real-time collaboration option; team consensus was to stick with GitHub to keep the workflow simple.
+
+### 🎮 Web UI & Movement Control (Major Milestone)
+
+- Developed the complete C++ backend for WiFi remote control, including an automated **500 ms "Watchdog"** safety mechanism that auto-stops the rover if the network connection drops.
+
+- Designed and implemented a responsive **"Hold-to-drive" Web UI** with a live command-history log for debugging. Deployed a temporary UI prototype via GitHub Pages for easy mobile access (this prototype was for backend adaptation/testing only — production UI is now served from the board itself, see 18 May).
+
+- Surveyed the team on **"Tank-style" (rotate-on-the-spot) vs "Car-style" (turn-while-moving) steering**; team picked Tank-style and the C++ backend was implemented accordingly.
+
+- Briefly discussed adding **joystick / analog control**; deferred — the Metro M0 has limited compute headroom (the course brief notes it can't run Python scripts), so we chose to stabilise the simple discrete-direction implementation first.
+
+- Added quality-of-life UI features: per-second connection heartbeat with on-screen "Connected/Disconnected" indicator, 4 diagonal curve buttons (one wheel 200, other wheel 100), a scrollable command history block with an expandable full-screen view, and **WASD / arrow-key keyboard control** for desktop use.
+
+- Wrote field test instructions (WiFi_Testing_Instructions.md) for the team to execute in the lab.
+
+### 📅 Next Steps
+
+- Next team meeting on the afternoon of 15 May to finalize sensor implementation strategies and integrate the frontend UI with the backend C++ motor control.
+
+## Date: 15 May 2026
+
+### 👥 Team Meeting (Hybrid)
+
+- Second team meeting at the EE lab, 1pm. Devesh, Chris, and I attended in person; Mohammed joined remotely via Teams at 2:30pm.
+
+- Agenda: share each member's individual research progress, discuss the overall rover plan, and rectify outstanding issues with the current build.
+
+### 🌐 Networking Architecture Discussion
+
+- Worked through how the rover receives signals over WiFi with Chris:
+
+  - The **EEERover** network is a closed local-only WiFi — it has no internet access and only routes packets between devices connected to it. So it effectively acts as the intermediate "server" between the controller (phone / laptop) and the rover.
+
+  - This means our existing implementation (HTTP requests from a browser on the same network) works without needing a separate backend server. If we ever wanted to control the rover from a device *not* on EEERover, we'd need to stand up our own server (e.g. run one on a laptop) as the intermediate.
+
+  - Confirmed the static-IP setup: WiFi.config(IPAddress(192, 168, 0, groupNumber + 1)) with groupNumber = 10, giving the rover the stable address 192.168.0.11.
+
+### 🛒 Procurement Discussion
+
+- Discussed components for each sub-team's sensor implementation. Originally (per the 13 May plan) we had aimed to finalize the bill of materials today, but the team agreed more research was still needed on a few items, so the final BOM decision was **pushed to a follow-up online meeting** (later held on 18 May).
+
+- Wangmo shared the supplier guidance (item name + item number, watch out for pack-of-10 quantities) so people could continue their parts research in the meantime; she would batch-order through the EEED website once the BOM is locked in.
+
+- No new parts needed for the Movement / UI module, so nothing to submit from my side.
+
+### 📡 Cross-team Status (for context)
+
+- Zifan reported the antenna coil for age detection failed initial testing — the standard plastic-coated copper wire only measured ~5 µH on the LCR meter, too low. He proposed switching to proper enamelled magnet wire and asked whether parts can be sourced outside the EEEStore.
+
+### 📋 Admin
+
+- Filled in the participation form (deadline 18 May 7pm).
+
+### 📅 Next Steps
+
+- Reconvene online to finalize the BOM once everyone's parts research is in (later held on 18 May).
+
+- In the meantime, continue working individually — fleshing out research, refining code, and updating personal progress logs for the eventual report.
+
+## Date: 18 May 2026
+
+### 🎮 Web UI & Movement Control
+
+- Implemented the **autonomous Web UI** build — UI no longer depends on the GitHub Pages prototype; the full HTML/CSS/JS is now served directly from the Metro M0 via **PROGMEM** (keeps the page in flash to save SRAM).
+
+- Restored the **advanced UI** features after the autonomous refactor: WASD / arrow-key control, command history log, connection-status indicator, and the sensor dashboard placeholder.
+
+- Added a **cache-buster** (?t=\<timestamp\>) to every HTTP request. Without it, the browser was caching movement commands, so repeated taps on the same direction button were silently dropped.
+
+### 🛠️ Hardware & Motor Control
+
+- Shipped a **stable 5-way movement build** (Forward / Backward / Left / Right / Stop). Earlier builds were running out of SRAM and the WiFi stack would crash intermittently — PROGMEM fixed this.
+
+- **Extended the build to full 8-way movement** later in the day — added the four diagonal directions (Forward-Left, Forward-Right, Backward-Left, Backward-Right) on top of the 5-way base. Inner wheel runs at 40% of the outer wheel speed for smoother diagonal turns. The Web UI's 3×3 directional grid now maps 1:1 to these 8 + Stop.
+
+- Tuned **PWM scaling** so the motors respond proportionally to commands rather than running flat-out only.
+
+- **Fixed the reversed forward/backward bug** by swapping the HIGH / LOW levels in setMotor(). Root cause: the motor wires are inverted relative to the H-bridge's expected polarity, so the software logic had to be inverted to match the actual wiring.
+
+### 👥 Team Meeting (Online)
+
+- Held the **follow-up online meeting** carried over from 15 May. Main agenda was finalizing the **bill of materials** — after the additional days of research, the team locked in which components need to be ordered (sensors, etc.). I'm not responsible for procurement myself, but attended to stay in the loop on what hardware the sensor sub-teams will be working with.
+
+### 💻 Software & Project Management
+
+- Synced **Devesh's magnetism detection** progress from his Google Doc into the repo under Tasks/Magnetism Detection/ so his hardware/code notes live alongside the rest of the project.
+
+### 📅 Next Steps
+
+- *(TODO: fill in any further team decisions if any)*
+
+## Date: 22 May 2026
+
+### 💻 Software & Tooling
+
+- Built an automated **Google Docs sync pipeline** (sync-gdocs.sh at the repo root). One command: rclone pulls the team's master .docx from Drive's "Shared with me", pandoc converts it to GitHub-flavored Markdown, and embedded images are extracted into Sync files on GitHub/Group10_assets/media/. No more manual re-export.
+
+- Added a project-root .gitignore to keep macOS .DS_Store files out of the repo.
+
+- **Pushed two outstanding local commits** to GitHub that had been sitting unpushed since 18 May — including the backward-bug fix and the advanced Web UI restoration. The remote had been running an older buggy version until today.
+
+### 🗂️ Project Management
+
+- Investigated setting up a parallel **Notion sync** for the team's "Engineering Project Tracker". Blocked by Notion permissions — my account only has read access, which doesn't allow adding the Integration required for API access. To unblock, will follow up with Christopher (PM) to either grant Full access or temporarily publish-to-web for an audit.
+
+### 📅 Next Steps
+
+- *(TODO: fill in)*
