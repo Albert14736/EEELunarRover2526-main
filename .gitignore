@@ -8,3 +8,7 @@
 
 # Sync tooling
 .env
+
+# Personal drafts / private chat logs (not for sharing on GitHub)
+Albert stuff/Movement_Logbook.md
+Albert stuff/whatsapp_conversation.md
