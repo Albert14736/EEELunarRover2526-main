@@ -12,7 +12,7 @@ const int DIR_LEFT  = 3;  // 现在 D3 负责 DIR
 const int EN_RIGHT  = 4;  // 现在 D4 负责 PWM
 const int DIR_RIGHT = 6;  // 现在 D6 负责 DIR
 
-const int SPEED = 200; 
+int SPEED = 200;  // 不再 const —— 由 /speed 滑块实时调节 
 
 // ==========================================
 // 2. WiFi Configuration
@@ -46,6 +46,10 @@ const char webpage[] PROGMEM = R"rawliteral(
     .dash-item { margin: 10px 0; font-size: 13px; display: flex; justify-content: space-between; border-bottom: 1px dashed #333; padding-bottom: 5px; }
     .dash-label { color: #ccc; }
     .dash-val { color: #f44336; font-family: monospace; }
+    .speed-control { margin-top: 25px; width: 80%; max-width: 300px; margin-left: auto; margin-right: auto; }
+    .speed-control label { display: block; font-size: 14px; margin-bottom: 8px; color: #ccc; }
+    #speed-slider { width: 100%; height: 30px; }
+    #speed-num { width: 55px; background: #111; color: #4CAF50; border: 1px solid #555; border-radius: 5px; font-family: monospace; font-weight: bold; font-size: 14px; text-align: center; padding: 3px; }
   </style>
 </head>
 <body oncontextmenu="return false;">
@@ -62,6 +66,11 @@ const char webpage[] PROGMEM = R"rawliteral(
     <button id="btn-bl" class="btn" onmousedown="startMove('/backward_left')" ontouchstart="startMove('/backward_left')">&#8601;</button>
     <button id="btn-bwd" class="btn" onmousedown="startMove('/backward')" ontouchstart="startMove('/backward')">&#9660;</button>
     <button id="btn-br" class="btn" onmousedown="startMove('/backward_right')" ontouchstart="startMove('/backward_right')">&#8600;</button>
+  </div>
+
+  <div class="speed-control">
+    <label>Speed: <input type="number" id="speed-num" min="60" max="255" step="1" value="200"> / 255</label>
+    <input type="range" id="speed-slider" min="60" max="255" value="200">
   </div>
 
   <div class="dashboard">
@@ -147,6 +156,7 @@ const char webpage[] PROGMEM = R"rawliteral(
     }
 
     document.addEventListener('keydown', function(e) {
+      if (e.target && e.target.tagName === 'INPUT') return; // 在数值框里打字时别触发开车
       var key = e.key.toLowerCase();
       if (keyState[key] !== undefined && !keyState[key]) {
         keyState[key] = 1; processKeys();
@@ -161,6 +171,26 @@ const char webpage[] PROGMEM = R"rawliteral(
 
     document.addEventListener('mouseup', stopMove);
     document.addEventListener('touchend', stopMove);
+
+    // 调速: 滑块 + 数值框联动, 数值夹在 60–255 之间
+    var speedSlider = document.getElementById('speed-slider');
+    var speedNum = document.getElementById('speed-num');
+    function clampSpeed(v) {
+      v = parseInt(v, 10);
+      if (isNaN(v)) v = parseInt(speedSlider.value, 10); // 空着/乱填 -> 回退当前值
+      return Math.max(60, Math.min(255, v));             // >255 拉回 255, <60 拉到 60
+    }
+    function applySpeed(v) {
+      speedSlider.value = v;
+      speedNum.value = v;
+      document.getElementById('status-box').innerHTML = "Speed set: " + v;
+      var sx = new XMLHttpRequest();
+      sx.open('GET', '/speed?v=' + v + '&t=' + new Date().getTime(), true);
+      sx.send();
+    }
+    speedSlider.addEventListener('input', function() { speedNum.value = this.value; });            // 拖动实时同步数字
+    speedSlider.addEventListener('change', function() { applySpeed(clampSpeed(this.value)); this.blur(); });
+    speedNum.addEventListener('change', function() { applySpeed(clampSpeed(this.value)); });        // 回车/失焦时夹值并发送
   </script>
 </body>
 </html>
@@ -259,6 +289,13 @@ void handleRoot() {
 
 void handlePing() { server.send(200, F("text/plain"), F("pong")); }
 
+void handleSpeed() {
+  if (server.hasArg("v")) {
+    SPEED = constrain(server.arg("v").toInt(), 60, 255); // 下限 60 防止电机堵转; 太低不动就把这个数调大
+  }
+  replyAPI(String(SPEED));
+}
+
 void setup() {
   pinMode(DIR_LEFT, OUTPUT); pinMode(EN_LEFT, OUTPUT);
   pinMode(DIR_RIGHT, OUTPUT); pinMode(EN_RIGHT, OUTPUT);
@@ -268,6 +305,7 @@ void setup() {
   while (WiFi.begin(ssid, pass) != WL_CONNECTED) { delay(500); }
   server.on("/", handleRoot);
   server.on("/ping", handlePing);
+  server.on("/speed", handleSpeed);
   server.on("/forward", moveForward);
   server.on("/backward", moveBackward);
   server.on("/left", turnLeft);

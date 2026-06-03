@@ -23,6 +23,11 @@
     .dash-item { margin: 10px 0; font-size: 15px; display: flex; justify-content: space-between; border-bottom: 1px dashed #333; padding-bottom: 5px; }
     .dash-label { color: #ccc; }
     .dash-val { color: #f44336; font-family: monospace; font-size: 12px; }
+    /* Speed control slider */
+    .speed-control { margin-top: 25px; width: 80%; max-width: 300px; margin-left: auto; margin-right: auto; }
+    .speed-control label { display: block; font-size: 14px; margin-bottom: 8px; color: #ccc; }
+    #speed-slider { width: 100%; height: 30px; }
+    #speed-num { width: 55px; background: #111; color: #4CAF50; border: 1px solid #555; border-radius: 5px; font-family: monospace; font-weight: bold; font-size: 14px; text-align: center; padding: 3px; }
   </style>
 </head>
 <body>
@@ -47,6 +52,12 @@
     <button id="btn-bl" class="btn" onmousedown="startMove('/backward_left')" onmouseup="stopMove()" ontouchstart="startMove('/backward_left')" ontouchend="stopMove()">&#8601;</button>
     <button id="btn-bwd" class="btn" onmousedown="startMove('/backward')" onmouseup="stopMove()" ontouchstart="startMove('/backward')" ontouchend="stopMove()">&#9660;</button>
     <button id="btn-br" class="btn" onmousedown="startMove('/backward_right')" onmouseup="stopMove()" ontouchstart="startMove('/backward_right')" ontouchend="stopMove()">&#8600;</button>
+  </div>
+
+  <!-- Speed control (mirrors the /speed endpoint in the rover firmware) -->
+  <div class="speed-control">
+    <label>Speed: <input type="number" id="speed-num" min="60" max="255" step="1" value="200"> / 255</label>
+    <input type="range" id="speed-slider" min="60" max="255" value="200">
   </div>
 
   <!-- Sensor Dashboard -->
@@ -201,6 +212,7 @@
     }
 
     document.addEventListener('keydown', function(e) {
+      if (e.target && e.target.tagName === 'INPUT') return; // don't trigger driving while typing in the speed box
       var key = e.key.toLowerCase();
       if (keyState[key] !== undefined) { if (!keyState[key]) { keyState[key] = 1; processKeys(); } e.preventDefault(); }
     });
@@ -208,6 +220,26 @@
       var key = e.key.toLowerCase();
       if (keyState[key] !== undefined) { keyState[key] = 0; processKeys(); e.preventDefault(); }
     });
+
+    // Speed control — slider + number box stay in sync; value clamped to 60–255
+    var speedSlider = document.getElementById('speed-slider');
+    var speedNum = document.getElementById('speed-num');
+    function clampSpeed(v) {
+      v = parseInt(v, 10);
+      if (isNaN(v)) v = parseInt(speedSlider.value, 10); // blank/garbage -> fall back to current
+      return Math.max(60, Math.min(255, v));             // >255 -> 255, <60 -> 60
+    }
+    function applySpeed(v) {
+      speedSlider.value = v;
+      speedNum.value = v;
+      statusBox.innerHTML = "Signal: <strong style='color:#fff; font-size:18px;'>/speed = " + v + "</strong>";
+      var sx = new XMLHttpRequest();
+      sx.open('GET', 'http://192.168.0.11/speed?v=' + v + '&t=' + new Date().getTime(), true);
+      try { sx.send(); } catch(e) {}
+    }
+    speedSlider.addEventListener('input', function() { speedNum.value = this.value; });            // live-sync number while dragging
+    speedSlider.addEventListener('change', function() { applySpeed(clampSpeed(this.value)); this.blur(); });
+    speedNum.addEventListener('change', function() { applySpeed(clampSpeed(this.value)); });        // clamp + send on Enter/blur
   </script>
 </body>
 </html>
