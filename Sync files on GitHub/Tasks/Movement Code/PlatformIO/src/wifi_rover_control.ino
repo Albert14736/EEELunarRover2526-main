@@ -12,7 +12,21 @@ const int DIR_LEFT  = 3;  // 现在 D3 负责 DIR
 const int EN_RIGHT  = 4;  // 现在 D4 负责 PWM
 const int DIR_RIGHT = 6;  // 现在 D6 负责 DIR
 
-int SPEED = 200;  // 不再 const —— 由 /speed 滑块实时调节 
+int SPEED = 200;  // 不再 const —— 由 /speed 滑块实时调节
+
+// ==========================================
+// IR (Infrared) Sensor — Chris 的红外: 中断计数, 算脉冲率分三档
+// ==========================================
+const int IR_PIN = 9;                  // D9 (空闲口; 避开电机 D2/3/4/6 与 WiFi D5/7/10)
+volatile unsigned long pulseCnt = 0;   // 中断里自增 -> 必须 volatile
+unsigned long lastIRTime = 0;
+float IRpulseRate = 0;
+void countPulse() { pulseCnt++; }      // ISR: 每个上升沿 +1
+
+// ==========================================
+// Magnetism Sensor — Devesh 的磁场: 模拟霍尔读 A4, 分上/下/无
+// ==========================================
+const int MAG_PIN = A4;                // A4 (空闲模拟口; ⚠️ 旧 sample 用 A0, 跟 Devesh 确认实际接线) 
 
 // ==========================================
 // 2. WiFi Configuration
@@ -76,7 +90,9 @@ const char webpage[] PROGMEM = R"rawliteral(
   <div class="dashboard">
     <div style="color: #fff; text-align: center; margin-bottom: 10px; font-weight: bold;">Sensor Dashboard</div>
     <div class="dash-item"><span class="dash-label">📡 Radio</span> <span class="dash-val">Active</span></div>
-    <div class="dash-item"><span class="dash-label">🧲 Magnetic</span> <span class="dash-val">Scanning...</span></div>
+    <div class="dash-item"><span class="dash-label">🧲 Magnetic</span> <span class="dash-val" id="mag-val">--</span></div>
+    <div class="dash-item"><span class="dash-label">🔥 Infrared</span> <span class="dash-val" id="ir-val">--</span></div>
+    <div class="dash-item"><span class="dash-label">🦇 Ultrasound</span> <span class="dash-val" id="us-val">Pending</span></div>
   </div>
 
   <div id="status-box">Status: Ready...</div>
@@ -113,6 +129,16 @@ const char webpage[] PROGMEM = R"rawliteral(
         document.getElementById('connection-indicator').style.color = '#f44336'; 
       };
       pxhttp.send();
+    }, 1000);
+
+    // 轮询传感器 (红外 + 磁场), 更新仪表盘
+    setInterval(function() {
+      var irx = new XMLHttpRequest(); irx.open('GET', '/ir?t=' + new Date().getTime(), true); irx.timeout = 800;
+      irx.onload = function() { if (irx.status == 200) document.getElementById('ir-val').innerHTML = irx.responseText; };
+      irx.send();
+      var mgx = new XMLHttpRequest(); mgx.open('GET', '/mag?t=' + new Date().getTime(), true); mgx.timeout = 800;
+      mgx.onload = function() { if (mgx.status == 200) document.getElementById('mag-val').innerHTML = mgx.responseText; };
+      mgx.send();
     }, 1000);
 
     function startMove(cmd) { 
@@ -296,16 +322,40 @@ void handleSpeed() {
   replyAPI(String(SPEED));
 }
 
+// 红外三档: <240 -> No IR, 240-400 -> 312, >400 -> 547 (右边再跟实测速率)
+String irStatus() {
+  if (IRpulseRate > 400)       return "547";
+  else if (IRpulseRate >= 240) return "312";
+  else                         return "No IR";
+}
+void handleIR() { replyAPI(irStatus() + " - " + String((int)IRpulseRate) + "/s"); }
+
+// 磁场: >680 上(N), <560 下(S), 中间无 (右边跟原始 ADC 值)
+String magStatus() {
+  int v = analogRead(MAG_PIN);
+  String dir;
+  if (v > 680)      dir = "UP (North)";
+  else if (v < 560) dir = "DOWN (South)";
+  else              dir = "None";
+  return dir + " - " + String(v);
+}
+void handleMag() { replyAPI(magStatus()); }
+
 void setup() {
   pinMode(DIR_LEFT, OUTPUT); pinMode(EN_LEFT, OUTPUT);
   pinMode(DIR_RIGHT, OUTPUT); pinMode(EN_RIGHT, OUTPUT);
   stopBoth(); 
   Serial.begin(9600);
+  pinMode(IR_PIN, INPUT);
+  attachInterrupt(digitalPinToInterrupt(IR_PIN), countPulse, RISING);
+  pinMode(MAG_PIN, INPUT);
   WiFi.config(IPAddress(192, 168, 0, groupNumber + 1));
   while (WiFi.begin(ssid, pass) != WL_CONNECTED) { delay(500); }
   server.on("/", handleRoot);
   server.on("/ping", handlePing);
   server.on("/speed", handleSpeed);
+  server.on("/ir", handleIR);
+  server.on("/mag", handleMag);
   server.on("/forward", moveForward);
   server.on("/backward", moveBackward);
   server.on("/left", turnLeft);
@@ -321,4 +371,16 @@ void setup() {
 void loop() {
   server.handleClient(); 
   if (millis() - lastCmdTime > WATCHDOG_TIMEOUT) { stopBoth(); }
+
+  // 红外: 每 ~200ms 用实际经过时间算脉冲率 (count/time, 自带时间补偿)
+  unsigned long irElapsed = millis() - lastIRTime;
+  if (irElapsed >= 200) {
+    noInterrupts();
+    unsigned long cnt = pulseCnt;
+    pulseCnt = 0;
+    interrupts();
+    lastIRTime = millis();
+    IRpulseRate = (float)cnt * 1000.0 / (float)irElapsed;
+    Serial.print("IR rate: "); Serial.print((int)IRpulseRate); Serial.print("/s -> "); Serial.println(irStatus());
+  }
 }

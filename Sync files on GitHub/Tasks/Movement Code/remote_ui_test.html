@@ -64,9 +64,9 @@
   <div class="dashboard">
     <div style="color: #fff; text-align: center; margin-bottom: 10px; font-weight: bold;">Sensor Dashboard</div>
     <div class="dash-item"><span class="dash-label">📡 Radio (Age)</span> <span class="dash-val">Wait for Zifan...</span></div>
-    <div class="dash-item"><span class="dash-label">🔥 Infrared</span> <span class="dash-val">Wait for Chris...</span></div>
+    <div class="dash-item"><span class="dash-label">🔥 Infrared</span> <span class="dash-val" id="ir-val">--</span></div>
     <div class="dash-item"><span class="dash-label">🦇 Ultrasound</span> <span class="dash-val">Wait for Wangmo...</span></div>
-    <div class="dash-item"><span class="dash-label">🧲 Magnetic</span> <span class="dash-val">Wait for Devesh...</span></div>
+    <div class="dash-item"><span class="dash-label">🧲 Magnetic</span> <span class="dash-val" id="mag-val">--</span></div>
   </div>
 
   <!-- Local test version only: Display simulated commands -->
@@ -124,6 +124,20 @@
       };
       pxhttp.onerror = pxhttp.ontimeout = function() { document.getElementById('connection-indicator').innerHTML = '<span style="color:#f44336;">❌ Disconnected</span>'; };
       try { pxhttp.send(); } catch(e) { document.getElementById('connection-indicator').innerHTML = '<span style="color:#f44336;">❌ Disconnected</span>'; }
+    }, 1000);
+
+    // Poll IR + magnetism and update the dashboard (best-effort; shows -- with no rover)
+    setInterval(function() {
+      var irx = new XMLHttpRequest();
+      irx.open('GET', 'http://192.168.0.11/ir?t=' + new Date().getTime(), true);
+      irx.timeout = 800;
+      irx.onload = function() { if (irx.status === 200) document.getElementById('ir-val').innerHTML = irx.responseText; };
+      try { irx.send(); } catch(e) {}
+      var mgx = new XMLHttpRequest();
+      mgx.open('GET', 'http://192.168.0.11/mag?t=' + new Date().getTime(), true);
+      mgx.timeout = 800;
+      mgx.onload = function() { if (mgx.status === 200) document.getElementById('mag-val').innerHTML = mgx.responseText; };
+      try { mgx.send(); } catch(e) {}
     }, 1000);
 
     function logCurrentAction() {
