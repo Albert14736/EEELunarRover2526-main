@@ -19,3 +19,6 @@ Albert stuff/wifi_explanation.txt
 
 # Team presentation deck (managed by Chris in Google Slides; local copy only)
 Sync files on GitHub/Projects/Interim Presentation/
+
+# Archive / backup zips (not source)
+*.zip

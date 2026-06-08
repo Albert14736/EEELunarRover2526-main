@@ -36,7 +36,12 @@ char ageBuf[AGE_BUF];                   // 正在累积的一段 (定长 char, �
 int  ageLen = 0;
 char lastAge[AGE_BUF] = "no signal";    // 最近一条完整读数 (网页 /age 展示)
 bool ageOverflow = false;               // 当前段超长(噪声/丢了'#') -> 整段丢弃
-bool ageSynced   = false;               // 是否已对齐到第一个 '#' -> 保证首条是完整段 
+bool ageSynced   = false;               // 是否已对齐到第一个 '#' -> 保证首条是完整段
+
+// ==========================================
+// Ultrasound Sensor — Wangmo 的超声: D8 数字读 40kHz 有/无
+// ==========================================
+const int US_PIN = 8;                   // D8 (空闲数字口; 原 snippet 用 pin2=左电机, 已改 D8) 
 
 // ==========================================
 // 2. WiFi Configuration
@@ -152,6 +157,9 @@ const char webpage[] PROGMEM = R"rawliteral(
       var agx = new XMLHttpRequest(); agx.open('GET', '/age?t=' + new Date().getTime(), true); agx.timeout = 800;
       agx.onload = function() { if (agx.status == 200) document.getElementById('age-val').innerHTML = agx.responseText; };
       agx.send();
+      var usx = new XMLHttpRequest(); usx.open('GET', '/us?t=' + new Date().getTime(), true); usx.timeout = 800;
+      usx.onload = function() { if (usx.status == 200) document.getElementById('us-val').innerHTML = usx.responseText; };
+      usx.send();
     }, 1000);
 
     function startMove(cmd) { 
@@ -356,6 +364,10 @@ void handleMag() { replyAPI(magStatus()); }
 
 void handleAge() { replyAPI(String(lastAge)); }   // 返回最近一条年龄读数
 
+// 超声: D8 数字读, HIGH=检测到 40kHz, LOW=无
+String usStatus() { return digitalRead(US_PIN) == HIGH ? "Detected" : "None"; }
+void handleUS() { replyAPI(usStatus()); }
+
 void setup() {
   pinMode(DIR_LEFT, OUTPUT); pinMode(EN_LEFT, OUTPUT);
   pinMode(DIR_RIGHT, OUTPUT); pinMode(EN_RIGHT, OUTPUT);
@@ -365,6 +377,7 @@ void setup() {
   pinMode(IR_PIN, INPUT);
   attachInterrupt(digitalPinToInterrupt(IR_PIN), countPulse, RISING);
   pinMode(MAG_PIN, INPUT);
+  pinMode(US_PIN, INPUT);
   WiFi.config(IPAddress(192, 168, 0, groupNumber + 1));
   while (WiFi.begin(ssid, pass) != WL_CONNECTED) { delay(500); }
   server.on("/", handleRoot);
@@ -373,6 +386,7 @@ void setup() {
   server.on("/ir", handleIR);
   server.on("/mag", handleMag);
   server.on("/age", handleAge);
+  server.on("/us", handleUS);
   server.on("/forward", moveForward);
   server.on("/backward", moveBackward);
   server.on("/left", turnLeft);
