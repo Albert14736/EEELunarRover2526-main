@@ -35,8 +35,8 @@ const int AGE_BUF = 40;
 char ageBuf[AGE_BUF];                   // 正在累积的一段 (定长 char, 不用 String 防堆碎片)
 int  ageLen = 0;
 char lastAge[AGE_BUF] = "no signal";    // 最近一条完整读数 (网页 /age 展示)
-unsigned long lastAgeRx = 0;            // 最近一次收到字节的时刻 (没数据时清屏用, 不是内容判定)
-const unsigned long AGE_TIMEOUT = 3000; // 3s 没有有效读数 -> 复位 "no signal" (信号丢失 / 纯噪声)
+unsigned long lastAgeCommit = 0;        // 最近一次「收完整一条读数」的时刻 (超时清屏基准)
+const unsigned long AGE_TIMEOUT = 2000; // 判定③: 2s 没有新的完整读数(如石头拿开) -> 复位 "no signal"
 
 // ==========================================
 // Ultrasound Sensor — Wangmo 的超声: D8 数字读 40kHz 有/无
@@ -415,26 +415,24 @@ void loop() {
     if (Serial) { Serial.print("IR rate: "); Serial.print((int)IRpulseRate); Serial.print("/s -> "); Serial.println(irStatus()); }
   }
 
-  // Radio/Age: 从 Serial1 读石头 ASCII; '#' 分隔。只显示「完整的一段 #...#」-> 抗噪声, 纯噪声不上屏;
-  // 每轮最多读 32 字节防饿死主循环; 距上次"有效读数" 3s -> 复位 "no signal"(信号丢失或纯噪声都会复位)。
-  // Radio/Age: '#' 和换行(\n \r) = 一条新读数 -> 清空 (网页单行框, 用清空代替换行)。
-  // 判定①: 每个字符判断是不是数字 -> 是才加入显示; 不是(?、符号...)直接跳过不显示。
-  // 每轮限读 32 字节防卡死主循环。
+  // Radio/Age: 判定① 只收数字(非数字如 '?'、符号跳过); 判定② 换行/'#'(一条读数结束)才更新显示
+  //            -> 网页稳定显示完整一条, 不再每来一个数字就闪半截。每轮限读 32 字节防卡死。
   int ageBudget = 32;
   while (Serial1.available() && ageBudget-- > 0) {
     char c = Serial1.read();
-    lastAgeRx = millis();
-    if (c == '#' || c == '\n' || c == '\r') {     // 分隔符(含换行) -> 新一条读数, 清空
-      ageLen = 0;
-    } else if (c >= '0' && c <= '9') {             // 判定①: 只有数字才加入显示 (?、符号等非数字直接跳过)
-      if (ageLen >= AGE_BUF - 1) ageLen = 0;       // 满了重来, 防越界
-      ageBuf[ageLen++] = c;
-      ageBuf[ageLen] = '\0';
-      strncpy(lastAge, ageBuf, AGE_BUF - 1); lastAge[AGE_BUF - 1] = '\0';
+    if (c == '#' || c == '\n' || c == '\r') {     // 换行/# = 一条读数结束
+      if (ageLen > 0) {                            // 判定②: 收完整了才把这一条更新到显示
+        ageBuf[ageLen] = '\0';
+        strncpy(lastAge, ageBuf, AGE_BUF - 1); lastAge[AGE_BUF - 1] = '\0';
+        lastAgeCommit = millis();                  // 记下最近一条完整读数的时刻 (超时基准)
+      }
+      ageLen = 0;                                  // 开新一条
+    } else if (c >= '0' && c <= '9') {             // 判定①: 只累积数字 (非数字 ?、符号跳过, 不立即刷新)
+      if (ageLen < AGE_BUF - 1) ageBuf[ageLen++] = c;
     }
   }
-  // 超过 3s 没收到任何字节 -> 清屏 no signal (拿开信号源后不卡旧值; 这只是没数据清屏, 不是内容判定)
-  if (lastAgeRx != 0 && (millis() - lastAgeRx) > AGE_TIMEOUT && strcmp(lastAge, "no signal") != 0) {
+  // 判定③: 超过 2s 没有新的完整读数 (石头拿开/没信号) -> 清屏 no signal, 不卡在上一条
+  if (lastAgeCommit != 0 && (millis() - lastAgeCommit) > AGE_TIMEOUT && strcmp(lastAge, "no signal") != 0) {
     strncpy(lastAge, "no signal", AGE_BUF - 1); lastAge[AGE_BUF - 1] = '\0';
   }
 }
