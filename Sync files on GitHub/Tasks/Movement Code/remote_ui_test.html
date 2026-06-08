@@ -63,7 +63,7 @@
   <!-- Sensor Dashboard -->
   <div class="dashboard">
     <div style="color: #fff; text-align: center; margin-bottom: 10px; font-weight: bold;">Sensor Dashboard</div>
-    <div class="dash-item"><span class="dash-label">📡 Radio (Age)</span> <span class="dash-val">Wait for Zifan...</span></div>
+    <div class="dash-item"><span class="dash-label">📡 Radio (Age)</span> <span class="dash-val" id="age-val">--</span></div>
     <div class="dash-item"><span class="dash-label">🔥 Infrared</span> <span class="dash-val" id="ir-val">--</span></div>
     <div class="dash-item"><span class="dash-label">🦇 Ultrasound</span> <span class="dash-val">Wait for Wangmo...</span></div>
     <div class="dash-item"><span class="dash-label">🧲 Magnetic</span> <span class="dash-val" id="mag-val">--</span></div>
@@ -138,6 +138,11 @@
       mgx.timeout = 800;
       mgx.onload = function() { if (mgx.status === 200) document.getElementById('mag-val').innerHTML = mgx.responseText; };
       try { mgx.send(); } catch(e) {}
+      var agx = new XMLHttpRequest();
+      agx.open('GET', 'http://192.168.0.11/age?t=' + new Date().getTime(), true);
+      agx.timeout = 800;
+      agx.onload = function() { if (agx.status === 200) document.getElementById('age-val').innerHTML = agx.responseText; };
+      try { agx.send(); } catch(e) {}
     }, 1000);
 
     function logCurrentAction() {

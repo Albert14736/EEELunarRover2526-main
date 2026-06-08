@@ -26,7 +26,17 @@ void countPulse() { pulseCnt++; }      // ISR: 每个上升沿 +1
 // ==========================================
 // Magnetism Sensor — Devesh 的磁场: 模拟霍尔读 A4, 分上/下/无
 // ==========================================
-const int MAG_PIN = A4;                // A4 (空闲模拟口; ⚠️ 旧 sample 用 A0, 跟 Devesh 确认实际接线) 
+const int MAG_PIN = A4;                // A4 (空闲模拟口; ⚠️ 旧 sample 用 A0, 跟 Devesh 确认实际接线)
+
+// ==========================================
+// Radio / Age — Zifan 的年龄: Serial1(D0=RX) 600bps 收 ASCII, '#' 分隔每条读数
+// ==========================================
+const int AGE_BUF = 40;
+char ageBuf[AGE_BUF];                   // 正在累积的一段 (定长 char, 不用 String 防堆碎片)
+int  ageLen = 0;
+char lastAge[AGE_BUF] = "no signal";    // 最近一条完整读数 (网页 /age 展示)
+bool ageOverflow = false;               // 当前段超长(噪声/丢了'#') -> 整段丢弃
+bool ageSynced   = false;               // 是否已对齐到第一个 '#' -> 保证首条是完整段 
 
 // ==========================================
 // 2. WiFi Configuration
@@ -89,7 +99,7 @@ const char webpage[] PROGMEM = R"rawliteral(
 
   <div class="dashboard">
     <div style="color: #fff; text-align: center; margin-bottom: 10px; font-weight: bold;">Sensor Dashboard</div>
-    <div class="dash-item"><span class="dash-label">📡 Radio</span> <span class="dash-val">Active</span></div>
+    <div class="dash-item"><span class="dash-label">📡 Radio</span> <span class="dash-val" id="age-val">--</span></div>
     <div class="dash-item"><span class="dash-label">🧲 Magnetic</span> <span class="dash-val" id="mag-val">--</span></div>
     <div class="dash-item"><span class="dash-label">🔥 Infrared</span> <span class="dash-val" id="ir-val">--</span></div>
     <div class="dash-item"><span class="dash-label">🦇 Ultrasound</span> <span class="dash-val" id="us-val">Pending</span></div>
@@ -131,7 +141,7 @@ const char webpage[] PROGMEM = R"rawliteral(
       pxhttp.send();
     }, 1000);
 
-    // 轮询传感器 (红外 + 磁场), 更新仪表盘
+    // 轮询传感器 (红外 + 磁场 + 年龄), 更新仪表盘
     setInterval(function() {
       var irx = new XMLHttpRequest(); irx.open('GET', '/ir?t=' + new Date().getTime(), true); irx.timeout = 800;
       irx.onload = function() { if (irx.status == 200) document.getElementById('ir-val').innerHTML = irx.responseText; };
@@ -139,6 +149,9 @@ const char webpage[] PROGMEM = R"rawliteral(
       var mgx = new XMLHttpRequest(); mgx.open('GET', '/mag?t=' + new Date().getTime(), true); mgx.timeout = 800;
       mgx.onload = function() { if (mgx.status == 200) document.getElementById('mag-val').innerHTML = mgx.responseText; };
       mgx.send();
+      var agx = new XMLHttpRequest(); agx.open('GET', '/age?t=' + new Date().getTime(), true); agx.timeout = 800;
+      agx.onload = function() { if (agx.status == 200) document.getElementById('age-val').innerHTML = agx.responseText; };
+      agx.send();
     }, 1000);
 
     function startMove(cmd) { 
@@ -341,11 +354,14 @@ String magStatus() {
 }
 void handleMag() { replyAPI(magStatus()); }
 
+void handleAge() { replyAPI(String(lastAge)); }   // 返回最近一条年龄读数
+
 void setup() {
   pinMode(DIR_LEFT, OUTPUT); pinMode(EN_LEFT, OUTPUT);
   pinMode(DIR_RIGHT, OUTPUT); pinMode(EN_RIGHT, OUTPUT);
   stopBoth(); 
   Serial.begin(9600);
+  Serial1.begin(600);     // Zifan 年龄: 石头 UART 600bps 从 D0(RX) 进
   pinMode(IR_PIN, INPUT);
   attachInterrupt(digitalPinToInterrupt(IR_PIN), countPulse, RISING);
   pinMode(MAG_PIN, INPUT);
@@ -356,6 +372,7 @@ void setup() {
   server.on("/speed", handleSpeed);
   server.on("/ir", handleIR);
   server.on("/mag", handleMag);
+  server.on("/age", handleAge);
   server.on("/forward", moveForward);
   server.on("/backward", moveBackward);
   server.on("/left", turnLeft);
@@ -372,15 +389,33 @@ void loop() {
   server.handleClient(); 
   if (millis() - lastCmdTime > WATCHDOG_TIMEOUT) { stopBoth(); }
 
-  // 红外: 每 ~200ms 用实际经过时间算脉冲率 (count/time, 自带时间补偿)
+  // 红外: 每 ~500ms 用实际经过时间算脉冲率 (count/time, 自带时间补偿)。窗口 200→500ms (Chris 更新: 计数更多, 速率更稳)
   unsigned long irElapsed = millis() - lastIRTime;
-  if (irElapsed >= 200) {
+  if (irElapsed >= 500) {
     noInterrupts();
     unsigned long cnt = pulseCnt;
     pulseCnt = 0;
     interrupts();
     lastIRTime = millis();
     IRpulseRate = (float)cnt * 1000.0 / (float)irElapsed;
-    Serial.print("IR rate: "); Serial.print((int)IRpulseRate); Serial.print("/s -> "); Serial.println(irStatus());
+    if (Serial) { Serial.print("IR rate: "); Serial.print((int)IRpulseRate); Serial.print("/s -> "); Serial.println(irStatus()); }
+  }
+
+  // Radio/Age: 从 Serial1 读石头 ASCII 流; '#' 分隔每条读数 (非阻塞, 只在有数据时读)。
+  // 只提交「两个 '#' 之间的完整段」避免显示半截; 超长段(噪声/丢分隔符)整段丢弃; if(Serial) 防 USB 卡死主循环。
+  while (Serial1.available()) {
+    char c = Serial1.read();
+    if (c == '#') {
+      if (ageSynced && ageLen > 0 && !ageOverflow) {       // 一段完整结束 -> 提交
+        ageBuf[ageLen] = '\0';
+        strncpy(lastAge, ageBuf, AGE_BUF - 1);
+        lastAge[AGE_BUF - 1] = '\0';
+        if (Serial) { Serial.print("Age: "); Serial.println(lastAge); }
+      }
+      ageLen = 0; ageOverflow = false; ageSynced = true;   // 对齐到分隔符, 开新段
+    } else if (ageSynced && c >= 32 && c <= 126) {          // 对齐后才收可打印字符 (滤 \r \n)
+      if (ageLen < AGE_BUF - 1) ageBuf[ageLen++] = c;
+      else ageOverflow = true;                              // 段太长 -> 标记, 整段作废
+    }
   }
 }
