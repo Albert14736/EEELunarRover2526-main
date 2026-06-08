@@ -35,8 +35,8 @@ const int AGE_BUF = 40;
 char ageBuf[AGE_BUF];                   // 正在累积的一段 (定长 char, 不用 String 防堆碎片)
 int  ageLen = 0;
 char lastAge[AGE_BUF] = "no signal";    // 最近一条完整读数 (网页 /age 展示)
-bool ageOverflow = false;               // 当前段超长(噪声/丢了'#') -> 整段丢弃
-bool ageSynced   = false;               // 是否已对齐到第一个 '#' -> 保证首条是完整段
+unsigned long lastAgeRx = 0;            // 最近收到字符的时刻 (超时复位用)
+const unsigned long AGE_TIMEOUT = 1500; // 无数据 1.5s -> 显示复位为 "no signal"
 
 // ==========================================
 // Ultrasound Sensor — Wangmo 的超声: D8 数字读 40kHz 有/无
@@ -415,21 +415,25 @@ void loop() {
     if (Serial) { Serial.print("IR rate: "); Serial.print((int)IRpulseRate); Serial.print("/s -> "); Serial.println(irStatus()); }
   }
 
-  // Radio/Age: 从 Serial1 读石头 ASCII 流; '#' 分隔每条读数 (非阻塞, 只在有数据时读)。
-  // 只提交「两个 '#' 之间的完整段」避免显示半截; 超长段(噪声/丢分隔符)整段丢弃; if(Serial) 防 USB 卡死主循环。
-  while (Serial1.available()) {
+  // Radio/Age: 从 Serial1 实时读石头 ASCII, '#' 分隔。显示实时跟随输入;
+  // 每轮最多读 32 字节防饿死主循环; 超过 AGE_TIMEOUT 没新数据 -> 复位 "no signal"。
+  int ageBudget = 32;
+  while (Serial1.available() && ageBudget-- > 0) {
     char c = Serial1.read();
+    lastAgeRx = millis();
     if (c == '#') {
-      if (ageSynced && ageLen > 0 && !ageOverflow) {       // 一段完整结束 -> 提交
-        ageBuf[ageLen] = '\0';
-        strncpy(lastAge, ageBuf, AGE_BUF - 1);
-        lastAge[AGE_BUF - 1] = '\0';
-        if (Serial) { Serial.print("Age: "); Serial.println(lastAge); }
-      }
-      ageLen = 0; ageOverflow = false; ageSynced = true;   // 对齐到分隔符, 开新段
-    } else if (ageSynced && c >= 32 && c <= 126) {          // 对齐后才收可打印字符 (滤 \r \n)
-      if (ageLen < AGE_BUF - 1) ageBuf[ageLen++] = c;
-      else ageOverflow = true;                              // 段太长 -> 标记, 整段作废
+      ageLen = 0;                                 // '#' 分隔 -> 开新段 (保留 lastAge 当前显示)
+    } else if (c >= 32 && c <= 126) {             // 可打印字符
+      if (ageLen >= AGE_BUF - 1) ageLen = 0;      // 段太长(噪声) -> 丢弃重来, 防越界
+      ageBuf[ageLen++] = c;
+      ageBuf[ageLen] = '\0';
+      strncpy(lastAge, ageBuf, AGE_BUF - 1);      // 实时更新, 输入变它就变
+      lastAge[AGE_BUF - 1] = '\0';
     }
+  }
+  // 拿开信号源 / 长时间没数据 -> 复位, 不卡在旧值
+  if (lastAgeRx != 0 && (millis() - lastAgeRx) > AGE_TIMEOUT && strcmp(lastAge, "no signal") != 0) {
+    strncpy(lastAge, "no signal", AGE_BUF - 1); lastAge[AGE_BUF - 1] = '\0';
+    ageLen = 0;
   }
 }
