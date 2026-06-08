@@ -35,8 +35,8 @@ const int AGE_BUF = 40;
 char ageBuf[AGE_BUF];                   // 正在累积的一段 (定长 char, 不用 String 防堆碎片)
 int  ageLen = 0;
 char lastAge[AGE_BUF] = "no signal";    // 最近一条完整读数 (网页 /age 展示)
-unsigned long lastAgeRx = 0;            // 最近收到字符的时刻 (超时复位用)
-const unsigned long AGE_TIMEOUT = 1500; // 无数据 1.5s -> 显示复位为 "no signal"
+unsigned long lastAgeRx = 0;            // 最近一次收到字节的时刻 (没数据时清屏用, 不是内容判定)
+const unsigned long AGE_TIMEOUT = 3000; // 3s 没有有效读数 -> 复位 "no signal" (信号丢失 / 纯噪声)
 
 // ==========================================
 // Ultrasound Sensor — Wangmo 的超声: D8 数字读 40kHz 有/无
@@ -415,25 +415,26 @@ void loop() {
     if (Serial) { Serial.print("IR rate: "); Serial.print((int)IRpulseRate); Serial.print("/s -> "); Serial.println(irStatus()); }
   }
 
-  // Radio/Age: 从 Serial1 实时读石头 ASCII, '#' 分隔。显示实时跟随输入;
-  // 每轮最多读 32 字节防饿死主循环; 超过 AGE_TIMEOUT 没新数据 -> 复位 "no signal"。
+  // Radio/Age: 从 Serial1 读石头 ASCII; '#' 分隔。只显示「完整的一段 #...#」-> 抗噪声, 纯噪声不上屏;
+  // 每轮最多读 32 字节防饿死主循环; 距上次"有效读数" 3s -> 复位 "no signal"(信号丢失或纯噪声都会复位)。
+  // Radio/Age: 跟源代码一样有啥读啥, 不再做 32-126 过滤。
+  // '#' 和换行(\n \r) = 一条新读数 -> 清空 (网页是单行框, 用清空代替源代码里的换行); 其余字节收到啥显示啥。
+  // 每轮限读 32 字节防卡死主循环。
   int ageBudget = 32;
   while (Serial1.available() && ageBudget-- > 0) {
     char c = Serial1.read();
     lastAgeRx = millis();
-    if (c == '#') {
-      ageLen = 0;                                 // '#' 分隔 -> 开新段 (保留 lastAge 当前显示)
-    } else if (c >= 32 && c <= 126) {             // 可打印字符
-      if (ageLen >= AGE_BUF - 1) ageLen = 0;      // 段太长(噪声) -> 丢弃重来, 防越界
+    if (c == '#' || c == '\n' || c == '\r') {     // 分隔符(含换行) -> 新一条读数, 清空
+      ageLen = 0;
+    } else if (c != 0) {                           // 其余字节全显示(不限可打印范围), 仅跳过 \0 防字符串截断
+      if (ageLen >= AGE_BUF - 1) ageLen = 0;       // 满了重来, 防越界
       ageBuf[ageLen++] = c;
       ageBuf[ageLen] = '\0';
-      strncpy(lastAge, ageBuf, AGE_BUF - 1);      // 实时更新, 输入变它就变
-      lastAge[AGE_BUF - 1] = '\0';
+      strncpy(lastAge, ageBuf, AGE_BUF - 1); lastAge[AGE_BUF - 1] = '\0';
     }
   }
-  // 拿开信号源 / 长时间没数据 -> 复位, 不卡在旧值
+  // 超过 3s 没收到任何字节 -> 清屏 no signal (拿开信号源后不卡旧值; 这只是没数据清屏, 不是内容判定)
   if (lastAgeRx != 0 && (millis() - lastAgeRx) > AGE_TIMEOUT && strcmp(lastAge, "no signal") != 0) {
     strncpy(lastAge, "no signal", AGE_BUF - 1); lastAge[AGE_BUF - 1] = '\0';
-    ageLen = 0;
   }
 }
