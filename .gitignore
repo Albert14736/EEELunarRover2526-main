@@ -3,24 +3,16 @@
 .AppleDouble
 .LSOverride
 
-# Editor
+# Editor / IDE
 .vscode/*.log
+.claude/
 
-# Sync tooling
+# Local secrets / tooling
 .env
 
-# Personal drafts / private chat logs (not for sharing on GitHub)
-Albert stuff/Movement_Logbook.md
-Albert stuff/whatsapp_conversation.md
-Albert stuff/Movement_Code_Design_Process.md
-Albert stuff/Movement_Code_Design_Process.txt
-Albert stuff/Report_Movement_Section.md
-Albert stuff/Report_Movement_Section.txt
-Albert stuff/wifi_explanation.txt
-Albert stuff/telling.html
-
-# Team presentation deck (managed by Chris in Google Slides; local copy only)
+# Local working files (not part of the submission)
+Albert stuff/
 Sync files on GitHub/Projects/Interim Presentation/
 
-# Archive / backup zips (not source)
+# Build artifacts and archives
 *.zip
