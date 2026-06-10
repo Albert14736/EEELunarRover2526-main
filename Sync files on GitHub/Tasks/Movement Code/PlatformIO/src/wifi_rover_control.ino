@@ -174,7 +174,7 @@ const char webpage[] PROGMEM = R"rawliteral(
       document.getElementById('status-box').innerHTML = "Sending: " + cmd;
       sendCmd(cmd);
       clearInterval(timer);
-      timer = setInterval(function() { sendCmd(cmd); }, 200);
+      timer = setInterval(function() { sendCmd(cmd); }, 20);
     }
 
     function stopMove() {
@@ -249,7 +249,7 @@ const char webpage[] PROGMEM = R"rawliteral(
 // 4. Core Motor Functions
 // ==========================================
 unsigned long lastCmdTime = 0;
-const unsigned long WATCHDOG_TIMEOUT = 500;
+const unsigned long WATCHDOG_TIMEOUT = 100;
 
 void replyAPI(const String& msg) {
   server.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
@@ -387,7 +387,7 @@ String rockType() {
 // /rock: combine type with the radio age -> "<age> yr <type>" (type only if no age yet)
 void handleRock() {
   String t = rockType();
-  if (t == "Unknown") { replyAPI("Unknown"); return; }
+  if (t == "Unknown") { replyAPI("Rock type: Unknown"); return; }
   if (strcmp(lastAge, "no signal") == 0) { replyAPI(t); return; }
   replyAPI(String(lastAge) + " yr " + t);
 }

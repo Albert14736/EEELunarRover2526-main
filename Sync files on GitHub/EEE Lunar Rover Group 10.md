@@ -81,7 +81,7 @@ HARDWARE
 
 **INTERIM PRESENTATION**
 
-<img src="Group10_assets/media/image7.png" style="width:6.26772in;height:4.02778in" />
+<img src="Group10_assets/media/image5.png" style="width:6.26772in;height:4.02778in" />
 
 **MAGNETISM DETECTION (DEVESH)**
 
@@ -104,6 +104,24 @@ As a North pole approaches, the voltage rises toward 3.3V value moves toward 102
 As south pole approaches, the voltage drops toward 0V (value moves toward 0).
 
 Magnetic field strength is proportional to r^3 so might only detect small changes. If the signal is too weak use Opamp as a non-onverting amplifier. MCP6002 opamp and build on breadboard
+
+**Get op amp working, in slides talk about challenges that voltage signal isnt strong enough and solution w op amp. Do research into how magnetic sensor works and background knowledge for Q and A. run basic code from laptop. Write future part (talk about mount).**
+
+**2-4 inclusive slides are my part**
+
+Measure is +vs or-ve depending on which face of the sensor the magnet goes on, if magnet south puth faces magnet at all times.
+
+0-1.8 in reality (in specs its0.2-1.8)
+
+<img src="Group10_assets/media/image3.png" style="width:6.05208in;height:1.25in" />since 1V is when there is no sensor, the digital reading is 310.
+
+Op amp
+
+<img src="Group10_assets/media/image1.png" style="width:6.26772in;height:1.43056in" />
+
+Need to be literally touching the magnetic for 1.8v reding anyways so gain of 2 works as we will knoe if its in our face regardless that 0.3 v range we lose is negligible
+
+<img src="Group10_assets/media/image18.png" style="width:6.26772in;height:0.55556in" />
 
 Sample code:
 
@@ -153,7 +171,139 @@ Positioning:
 
 - 3D print a mount that can connect to the pins
 
-**MOVEMENT (ALBERT)**
+const int hallPin = A0;
+
+// Rolling Average Configuration
+
+const int numReadings = 8; // Size of the filter window. Higher = smoother but slightly slower response.
+
+int readings\[numReadings\]; // Array to store the raw ADC snapshots
+
+int readIndex = 0; // Current position in the array
+
+long total = 0; // Running sum of the array
+
+int average = 0; // The smoothed output
+
+// Baseline Configuration
+
+int baselineValue = 0; // This will store the "zeroed out" resting value
+
+void setup() {
+
+Serial.begin(9600);
+
+// --- 1. ZEROING OUT THE MOTORS (CALIBRATION) ---
+
+Serial.println("Calibrating baseline...");
+
+Serial.println("Ensure motors are running at default idle and magnets are far away.");
+
+delay(2000); // Give the motors 2 seconds to spin up and stabilize their magnetic field
+
+long calibrationTotal = 0;
+
+int calibrationSamples = 50; // Take a deep average to find the absolute center
+
+for (int i = 0; i \< calibrationSamples; i++) {
+
+calibrationTotal += analogRead(hallPin);
+
+delay(10);
+
+}
+
+// Set the new dynamic "middle" (Should be roughly around 310)
+
+baselineValue = calibrationTotal / calibrationSamples;
+
+Serial.print("Calibration complete. Baseline set to: ");
+
+Serial.println(baselineValue);
+
+// --- 2. PRE-FILL THE ROLLING AVERAGE ARRAY ---
+
+// We fill the array with the baseline so the math doesn't start at 0 and falsely trigger
+
+for (int i = 0; i \< numReadings; i++) {
+
+readings\[i\] = baselineValue;
+
+total += baselineValue;
+
+}
+
+}
+
+void loop() {
+
+// --- 3. ROLLING AVERAGE FILTER ---
+
+// Subtract the oldest reading from the total
+
+total = total - readings\[readIndex\];
+
+// Read the newest raw value from the sensor
+
+readings\[readIndex\] = analogRead(hallPin);
+
+// Add the newest reading to the total
+
+total = total + readings\[readIndex\];
+
+// Advance to the next position in the array
+
+readIndex = readIndex + 1;
+
+// Wrap around to the beginning if we hit the end of the array
+
+if (readIndex \>= numReadings) {
+
+readIndex = 0;
+
+}
+
+// Calculate the smoothed average
+
+average = total / numReadings;
+
+// --- 4. MAGNETIC FIELD DETECTION ---
+
+// Calculate how far we've deviated from the zeroed-out motor baseline
+
+int deviation = average - baselineValue;
+
+// Using a threshold of +/- 30 to avoid any remaining noise slipping through
+
+if (deviation \> 30) {
+
+Serial.print("North Pole Approaching! Signal Strength: ");
+
+Serial.println(deviation);
+
+} else if (deviation \< -30) {
+
+Serial.print("South Pole Approaching! Signal Strength: ");
+
+Serial.println(abs(deviation));
+
+} else {
+
+// If the deviation is between -30 and 30, we consider it clear
+
+Serial.println("Clear. No strong magnetic rocks nearby.");
+
+}
+
+// A small delay for overall stability
+
+delay(50);
+
+}
+
+**MOVEMENT (ALB**
+
+**ERT)**
 
 <u>How the robot can be controlled</u>
 
@@ -358,9 +508,258 @@ We can fix this by the software or just connecting the wires to different parts 
 
 **AGE DETECTION (MOHAMMED + ZIFAN)**
 
-**USER INTERFACE (MOHAMMED + ALBERT)**
-
 **ULTRASONIC DETECTION (HARRY)**
+
+**<u>Background</u>**
+
+The rover will need to differentiate rocks based on the presence of multiple signals. The ultrasonic circuit will determine whether a 40kHz ultrasonic signal is emitted, after the presence of an infrared signal is found, it will be able to classify the type of rock.
+
+Below is the table of types of rock and its corresponding signal presence
+
+| **Types** | **Ultrasound signal presence** | **IR Rate** |
+|-----------|--------------------------------|-------------|
+| Basaltoid | True                           | 547s^-1     |
+| Gravion   | False                          | 312s^-1     |
+| Regolix   | True                           | 547s^-1     |
+| Lunarite  | False                          | 312s^-1     |
+
+Ultrasonic presence separates {Basaltoid and Regolix } from the rock types, then the infrared rate will be used to distinguish within each pair (NO ultrasonic or when it exists). The role of this circuit would be to generate a clean logic signal representing the presence of an ultrasonic signal.
+
+**<u>Design Process</u>**
+
+**<u>Requirements</u>**
+
+The circuit should follow these points;
+
+- Detects the presence or absence of a 40kHz acoustic signal.
+
+- Reject signal out of domain, which could be from motor vibration, ambient acoustic noise etc.
+
+- Present the result to a microcontroller’s digital pin as a clean digital level.
+
+- Able to detect presence of signal from a reasonable distance.
+
+The raw signal from the 400SR-series receiver is a weak AC waveform and has a peak-to-peak value of roughly 10mV \[I need to measure the actual value in the lab\].
+
+\[Picture of signal view on Oscilloscope, I can also use the auto-measure function\]
+
+Therefore the signal should be amplified substantially before we can perform signal alteration operations.
+
+**<u>Proposed Plan</u>**
+
+Therefore we will be building a circuit with following stages to convert an AC signal received by the transducer and generate a clean DC logic signal.
+
+Input : messy AC signal.
+
+Output : Clean DC voltage output representing the presence of ultrasonic signal.
+
+Transducer -\> Active Filter (Opamp with Band-pass-filters) -\> Envelope Detector -\> Comparator.
+
+**<u>Expected change of signal</u>**
+
+Expected change of signal would be as follows :
+
+<img src="Group10_assets/media/image8.jpg" style="width:2.79688in;height:1.36548in" />
+
+> Unmodified signal from the transducer would be an AC signal with weak amplitude.
+
+—-------------------------------------------------------------------------------------------
+
+<img src="Group10_assets/media/image8.jpg" style="width:2.89063in;height:1.77826in" />
+
+This part of circuit is an \`Active Filter\` This is used to filter out the parts that are out of band and amplify the signal within the specified range of frequency. We should also set up a
+
+bias point around 2.5V to avoid
+
+clipping the -ve part of the signal.
+
+—---------------------------------------------------------------------------------------------
+
+<img src="Group10_assets/media/image22.jpg" style="width:2.80208in;height:1.66374in" />
+
+Envelope Detector is used to smoothen out the alternating signal.
+
+—---------------------------------------------------------------------------------------------
+
+> Schmitt Trigger converts those pulses into a clean digital signal. With a high voltage outlining the presence and 0V representing the absence.<img src="Group10_assets/media/image22.jpg" style="width:3in;height:1.22869in" />
+
+**<u>Component Selection</u>**
+
+1.  Ultrasonic Transducer. (Used for stage 0)
+
+Write about MCP6022, mention that its frequency is centered around 40kHz. Why would that be good?
+
+Also explain that you chose this because of : (See Below)
+
+h component and maybe some conditions or any notes to take.
+
+Critical Evaluation :
+
+We can discuss the \`Gain-Bandwidth product\`.
+
+> For example, if the MCP6022 has a GBPWP of 10MHz, show that at the target frequency of 40kHz the maximum achievable gain per stage before phase shift or distortion is :
+>
+> 10Mhz (GBWP of MCP6022)
+>
+> Max Gain = ——---—------------------------------ = 250.
+
+40kHz (Target frequency)
+
+If I run out of things to write, I can write why I chose a rail-to-rail amplifier.
+
+2.  Opamp
+
+MCP6022,
+
+We can talk about the following:
+
+- 
+
+3.  Diode (1N4148)
+
+This diode has a 0.7V voltage gap.
+
+4.  Comparator(LM393P)
+
+> This is good because : \~\~\~\~~
+
+Discuss what each component can provide.
+
+## Technical Implementation
+
+**<u>Circuit Architecture</u>**
+
+- **Pre-Amplification Stage**
+
+- **Amplification**
+
+- **Envelope Detector**
+
+- **Comparator**
+
+### **<u>0. Pre-amplification Stage</u>**
+
+<img src="Group10_assets/media/image4.png" style="width:3.26563in;height:2.61458in" />
+
+An AC signal is received by the ultrasonic transducer (MCP6022), which oscillates at around (10mV). Feeding the raw AC signal into an op-amp would clip the negative half of the waveform, since the output cannot swing below the negative rail.
+
+(Insert a picture of the Signal output from the raw transducer. Taking picture from Oscilloscope, also use auto measure to show that peak-to-peak value is around 10mV)
+
+An AC signal is received by the ultrasonic transducer (MCP6022), which oscillates at around (10mV). Feeding the raw AC signal into an op-amp would clip the negative half of the waveform, since the output cannot swing below the negative rail.
+
+Therefore I had set up a bias reference point using a potential divider circuit using R1 and R2 both set to 10k(ohms), at 2.5V, so that the signal now oscillates around 2.5V.
+
+An input decoupling capacitor is placed in series with the transducer to block out any external DC offset while passing the AC signal.
+
+#### Testing - Stage 1\
+
+### **<u>1 - Amplifier with frequency filterings</u>**<img src="Group10_assets/media/image4.png" style="width:3.98438in;height:2.60589in" />
+
+The environment around the rover contains acoustic sounds and noises from motors, surroundings etc. In order to analyse the ultrasonic signal, we would have to isolate the signal around 40kHz to only get the ultrasonic signal.
+
+1)  Passive High band pass filter (C1 and R2)
+
+\[Components in charge : C1, R1, R2\]
+
+<img src="Group10_assets/media/image13.png" style="width:1.27604in;height:2.43608in" />
+
+> C1 not only acts as an AC input decoupling capacitor but also as a high band pass filter along with the resistor placed (R1 \|\| R2).
+>
+> This filters out the low-frequency noise before we apply gain to the signal through the opamp.
+>
+> Cut-off frequency is : 3.2kHz
+>
+> Calculation is ⇒
+
+2)  Opamp - gain of 241.
+
+\[Components in charge : OPAMP, R3, R4, C2\]
+
+> We would like to amplify the signal by 241 (240 + 1 \[original\]), I chose this value because it will amplify the voltage above a level where it can be used by comparator and also for low-pass filter.
+
+Gain is calculated by this equation : (1 + R4(feedback) / R3) = 1 + 240 = 241.
+
+3)  Low-pass filter. (From the opamp GBWP)
+
+> We would need to cut out the signal above the specified frequency (around 42kHz). This is done by the roll-off frequency determined by the transducer’s gain and its GBWP(Gain-Bandwidth-Product).
+>
+> Roll-off frequency = GBWP/Gain
+>
+> = 10MHz / 241
+
+~= 42kHz
+
+> Therefore the opamp also acts as a low-band filter blocking out the signal above 42kHz.
+>
+> <img src="Group10_assets/media/image7.png" style="width:6.26772in;height:3.375in" />
+>
+> Since the transducer picks up a signal centered at 40kHz, we will get a signal mostly consisting of a frequency around 40kHz.
+
+**<u>Testing</u>**
+
+### **<u>2. Envelope Detector</u>**
+
+<img src="Group10_assets/media/image11.png" style="width:5.34896in;height:4.43377in" />
+
+Problem : Pure signal from the previous stages outputs a high frequency AC signal.
+
+We use the envelope detector which takes in high-frequency modulated signals and outputs its ‘envelope’ which is a smooth curve that outlines the peak of the original waveform.
+
+Explain that a microcontroller cannot process a high frequency signal since it would require a massive amount of processing power for high-frequency sampling.
+
+### **<u>3. Comparator Stage - Schmitt Trigger Hysteresis</u>**
+
+Problem : Amplitude of the signal is not constant, it fluctuates very much depending on the distance from sensor to the rock.
+
+<img src="Group10_assets/media/image10.png" style="width:6.26772in;height:3.98611in" alt="Circuit diagram of comparator stage." />
+
+We convert the smoothed analogue signal from envelope stage into a digital \`High\` or \`Low\` logic signal that can be used to represent the presence of an ultrasonic signal. This is done by setting a reference voltage and when the signal crosses the threshold, the output snaps cleanly to a digital logic signal.
+
+Explain about Schmitt trigger, and show the calculation for the upper threshold and lower threshold.
+
+Also we can verify this using an oscilloscope and a power supply. By viewing how the output of a comparator changes as you change the input voltage.
+
+## **<u>Evaluation of Ultrasonic Subsystem.</u>**
+
+**<u>Verification of the circuit.</u>**
+
+The circuit has been tested for each part of the circuit.
+
+1)  
+
+I can use the oscilloscope’s signal generator to verify that the circuit cuts out the frequencies below and above the set domain of frequency.
+
+\[ Picture of the oscilloscope : Using signal generator in oscilloscope\]
+
+\[ Multiple pictures of the oscilloscope showing the change in the signal\]
+
+2)  Envelope Detector.
+
+\[ Multiple pictures of the oscilloscope showing the change in the signal\]
+
+3)  Comparator - Schmitt trigger
+
+> \[ Picture of the signal in oscilloscope\]
+
+As you can see from the photo above, output is a clean DC logic voltage. With 5V as HIGH and 0V as LOW.
+
+This will be connected to a digital pin of an arduino and be used to detect a presence of signal.
+
+\[ Multiple pictures of the oscilloscope showing the change in the signal\]
+
+**<u>Others</u>**
+
+<img src="Group10_assets/media/image21.png" style="width:3.33882in;height:2.73438in" />
+
+**Datasheet for MCP6022 : [<u>https://ww1.microchip.com/downloads/aemDocuments/documents/MSLD/ProductDocuments/DataSheets/MCP6021-Data-Sheet-DS20001685.pdf</u>](https://ww1.microchip.com/downloads/aemDocuments/documents/MSLD/ProductDocuments/DataSheets/MCP6021-Data-Sheet-DS20001685.pdf)**
+
+**Datasheet for LM393P :**
+
+[**<u>https://www.ti.com/lit/ds/symlink/lm2903b.pdf?ts=1780888870193</u>**](https://www.ti.com/lit/ds/symlink/lm2903b.pdf?ts=1780888870193)
+
+**This is the circuit diagram of the ultrasonic subsystem.**
+
+<img src="Group10_assets/media/image4.png" style="width:6.26772in;height:2.40278in" />
 
 **INFRARED DETECTION (CHRIS)**
 
@@ -368,7 +767,7 @@ We can fix this by the software or just connecting the wires to different parts 
 
 The types of a rock is indicated by an infrared signal pulse rate with a Poisson distribution, ultrasonic signal and magnetic fields. For infrared signal, you have already made a light sensor as part of the EEEBug and most <span class="mark">silicon-based photosensors</span> (such as the EEEBug phototransistor) are just as sensitive to infrared as visible light. You will need to measure the infrared pulses rate and this can be done with <span class="mark">analogue or digital methods</span>.
 
-The optical power given by the rock is weaker than the light source you used for the EEEBug so you may need to amplify the output. Ambient light will cause interference and this can be <span class="mark">filtered out by using a sensor that is only sensiteamstive to the wavelength of the rock emission (950nm) and by using electronic filters</span>. Many sources of electric light have a strong frequency component at 100Hz due to the rectification effect of the 50Hz AC source.
+The optical power given by the rock is weaker than the light source you used for the EEEBug so you may need to amplify the output. Ambient light will cause interference and this can be <span class="mark">filtered out by using a sensor that is only sensitive to the wavelength of the rock emission (950nm) and by using electronic filters</span>. Many sources of electric light have a strong frequency component at 100Hz due to the rectification effect of the 50Hz AC source.
 
 The infrared <span class="mark">pulse rate</span> is approximately λ=547 s-1 or λ=312 s-1 depending on the type of a rock. The <span class="mark">pulse width</span> of the infrared signal is just <span class="mark">50μs</span> and the <span class="mark">amplitude</span> that you observe <span class="mark">will be reduced if you filter out the high frequency harmonics</span>. <span class="mark">Low-pass filtering</span> may smooth out the edges of the pulse and <span class="mark">make pulse rate measurement less accurate</span>. There can even be a problem with the sensor itself, since all optical sensors have a capacitance that acts to introduce a low-pass filter. There may be a <span class="mark">trade-off between the speed and the sensitivity of your sensor.</span>
 
@@ -392,7 +791,7 @@ A recommended method for measuring random infrared pulse rates on a lab oscillos
 
 A phototransistor acts like a <span class="mark">light-dependent current source</span>. It requires a <span class="mark">bias voltage to work and a load resistor in series</span> to convert the current into a voltage that can be measured by the ADC. Additionally, a <span class="mark">capacitor can be added to create a low-pass filter that will remove any high-frequency noise</span>.
 
-<img src="Group10_assets/media/image4.png" style="width:6.26772in;height:3.51389in" />
+<img src="Group10_assets/media/image6.png" style="width:6.26772in;height:3.51389in" />
 
 **<u>Design Log</u>**
 
@@ -531,7 +930,7 @@ When deciding the type of opamp to use, I must pay attention to the gain-bandwid
 <th>Slew rate</th>
 <th><p>The slew rate of an operational amplifier is the maximum rate of change of its output voltage. This will limit the speed of amplification.</p>
 <p>The pulsewidth is 50microseconds, which means that for optimised processing speed, the opamp slew rate must be equal to or higher than 50microseconds so it can respond quickly to the rise and falls in IR signal due to the short pulses.</p>
-<p><img src="Group10_assets/media/image1.png" style="width:3.1369in;height:2.60938in" /></p>
+<p><img src="Group10_assets/media/image15.png" style="width:3.1369in;height:2.60938in" /></p>
 <p>The LT1366 opamp has a slew rate of 0.13V/us which is very low and unideal for this detection</p></th>
 </tr>
 <tr>
@@ -569,7 +968,7 @@ I decided to end my research here. I will select a phototransistor with built in
 
 Continuing from my previous research, I began searching for an ideal phototransistor on Mouser. I found the following two transistors which could be ideal for detection.
 
-<img src="Group10_assets/media/image3.png" style="width:6.26772in;height:2.41667in" />
+<img src="Group10_assets/media/image14.png" style="width:6.26772in;height:2.41667in" />
 
 | TEFT4300 | https://www.vishay.com/docs/81549/teft4300.pdf |
 |----------|------------------------------------------------|
@@ -583,23 +982,23 @@ As for the opamp, I choose one based on GBP and slew rate. Slew rate should be a
 
 I now move onto testing the infrared detection method as proposed in the github. I replicated the phototransistor sensor setup detailed in the sensor lab skills section like so:
 
-<img src="Group10_assets/media/image8.png" style="width:5.45248in;height:3.07041in" />
+<img src="Group10_assets/media/image16.png" style="width:5.45248in;height:3.07041in" />
 
-I configured the arduino code to run on the metro board and then ran a simulation using my torchlight to confirm that the detector works as per normal. I then used the rock simulator to perform a IR detection test.
+I configured the arduino code to run on the metro board and then ran a simulation using my torchlight to confirm that the detector works as per normal. I then used the rock simulator to perform an IR detection test.
 
-<img src="Group10_assets/media/image9.png" style="width:4.72396in;height:2.66017in" />
+<img src="Group10_assets/media/image20.png" style="width:4.72396in;height:2.66017in" />
 
-<img src="Group10_assets/media/image6.png" style="width:2.00139in;height:3.55729in" />
+<img src="Group10_assets/media/image23.png" style="width:2.00139in;height:3.55729in" />
 
 I couldn’t obtain any noticeable pulses on the oscilloscope or the serial monitor when testing with the rock simulator, even though the phototransistor was sensitive to light. I realised that the capacitor in parallel might be affecting the detection of pulses as capacitors act as filters. I then removed the capacitor and found that the pulses were now being detected as spikes on the oscilloscope and large value jumps on the serial monitor.
 
-<img src="Group10_assets/media/image11.png" style="width:6.26772in;height:3.52778in" />
+<img src="Group10_assets/media/image17.png" style="width:6.26772in;height:3.52778in" />
 
 I note that the signal is detected when the diode points at roughly mid level to the internal PCB of the rock simulator. Upon covering the internal PCB with the rock case, I observed that the pulses had dropped significantly. I could only see very small pulses, as shown below:
 
-<img src="Group10_assets/media/image5.png" style="width:5.27604in;height:2.97106in" />
+<img src="Group10_assets/media/image24.png" style="width:5.27604in;height:2.97106in" />
 
-<img src="Group10_assets/media/image10.png" style="width:5.41146in;height:3.04732in" />
+<img src="Group10_assets/media/image9.png" style="width:5.41146in;height:3.04732in" />
 
 With this in mind, I believe a gain of 10-20 would be sufficient to amplify the signal back to a readable value.
 
@@ -614,6 +1013,24 @@ Slew rate is 30V/us which far exceeds the pulse width, will be able to respond q
 Can operate from 2.7 to 12V, suitable range as access to 3.3V and 5V voltage nodes.
 
 Is also dual channel, can be used for amplification of other detection circuits so as to maximise breadboard space efficiency.
+
+Changed to MCP6022I/P (explain why later)
+
+**22/05**
+
+All parts needed have arrived, proper design testing begins. First reconfigure test setup using new parts. Keep in mind digital pins 6,4,3,2 used for motor control
+
+Bought TEFT and BPV to test and compare. First set up using TEFT
+
+[<u>https://www.youtube.com/watch?v=zNAbcUSptWE</u>](https://www.youtube.com/watch?v=zNAbcUSptWE)
+
+Determine the gain, start with a test of gain = 10, easiest choice of resistors is 10k and 100k -\> gain = 11 (non-inverting) INSERT PIC OF nodal analysis circuit drawing
+
+Detection pre opamp successful using TEFT4300, insert pics, scale for V = 10V. Upon covering w rock, need to increase scale to 50mV to obtain visible pulse, large drop off due to rock interference
+
+Implement opamp
+
+Note, check original signal detection, why amplitude so high? If too high cannot be fed into opamp, would explain why opamp not working
 
 Tab 2
 
@@ -692,9 +1109,9 @@ Maintained here as a draft; the contents are periodically copy-pasted into the t
 
 - Worked through how the rover receives signals over WiFi with Chris:
 
-  - The **EEERover** network is a closed local-only WiFi — it has no internet access and only routes packets between devices connected to it. So it effectively acts as the intermediate "server" between the controller (phone / laptop) and the rover.
+  - The EEERover network is a closed local-only WiFi — it has no internet access and only routes packets between devices connected to it. So it effectively acts as the intermediate "server" between the controller (phone / laptop) and the rover.
 
-  - This means our existing implementation (HTTP requests from a browser on the same network) works without needing a separate backend server. If we ever wanted to control the rover from a device *not* on EEERover, we'd need to stand up our own server (e.g. run one on a laptop) as the intermediate.
+  - This means our existing implementation (HTTP requests from a browser on the same network) works without needing a separate backend server. If we ever wanted to control the rover from a device not on EEERover, we'd need to stand up our own server (e.g. run one on a laptop) as the intermediate.
 
   - Confirmed the static-IP setup: WiFi.config(IPAddress(192, 168, 0, groupNumber + 1)) with groupNumber = 10, giving the rover the stable address 192.168.0.11.
 
