@@ -3,57 +3,55 @@
 #include <WiFiWebServer.h>
 
 // ==========================================
-// 1. Hardware Pin Definitions (功能对调，适配物理接线)
+// 1. Motor pin definitions
 // ==========================================
-// 之前测试发现：物理上的 PWM 孔连到了 Metro 的 D2/D4，DIR 孔连到了 D3/D6
-// 所以我们在软件里把定义互换
-const int EN_LEFT   = 2;  // 现在 D2 负责 PWM
-const int DIR_LEFT  = 3;  // 现在 D3 负责 DIR
-const int EN_RIGHT  = 4;  // 现在 D4 负责 PWM
-const int DIR_RIGHT = 6;  // 现在 D6 负责 DIR
+const int EN_LEFT   = 2;  // left motor PWM
+const int DIR_LEFT  = 3;  // left motor direction
+const int EN_RIGHT  = 4;  // right motor PWM
+const int DIR_RIGHT = 6;  // right motor direction
 
-int SPEED = 200;  // 不再 const —— 由 /speed 滑块实时调节
+int SPEED = 200;  // motor speed, set at runtime via /speed
 
 // ==========================================
-// IR (Infrared) Sensor — Chris 的红外: 中断计数, 算脉冲率分三档
+// Infrared sensor (rock type): interrupt pulse counter -> pulse rate
 // ==========================================
-const int IR_PIN = 9;                  // D9 (空闲口; 避开电机 D2/3/4/6 与 WiFi D5/7/10)
-volatile unsigned long pulseCnt = 0;   // 中断里自增 -> 必须 volatile
+const int IR_PIN = 9;                  // D9
+volatile unsigned long pulseCnt = 0;   // volatile: written inside the ISR
 unsigned long lastIRTime = 0;
 float IRpulseRate = 0;
-void countPulse() { pulseCnt++; }      // ISR: 每个上升沿 +1
+void countPulse() { pulseCnt++; }      // ISR: +1 per pulse
 
 // ==========================================
-// Magnetism Sensor — Devesh 的磁场: 模拟霍尔读 A4, 分上/下/无
+// Magnetism sensor (rock type): analogue Hall on A4 -> up/down/none
 // ==========================================
-const int MAG_PIN = A4;                // A4 (空闲模拟口; ⚠️ 旧 sample 用 A0, 跟 Devesh 确认实际接线)
+const int MAG_PIN = A4;                // A4
 
 // ==========================================
-// Radio / Age — Zifan 的年龄: Serial1(D0=RX) 600bps 收 ASCII, '#' 分隔每条读数
+// Radio / age: Serial1 (D0 RX) at 600 baud, ASCII digits per reading
 // ==========================================
 const int AGE_BUF = 40;
-char ageBuf[AGE_BUF];                   // 正在累积的一段 (定长 char, 不用 String 防堆碎片)
+char ageBuf[AGE_BUF];                   // reading currently being accumulated
 int  ageLen = 0;
-char lastAge[AGE_BUF] = "no signal";    // 最近一条完整读数 (网页 /age 展示)
-unsigned long lastAgeCommit = 0;        // 最近一次「收完整一条读数」的时刻 (超时清屏基准)
-const unsigned long AGE_TIMEOUT = 2000; // 判定③: 2s 没有新的完整读数(如石头拿开) -> 复位 "no signal"
+char lastAge[AGE_BUF] = "no signal";    // latest complete reading (served on /age)
+unsigned long lastAgeCommit = 0;        // time of last complete reading (for timeout)
+const unsigned long AGE_TIMEOUT = 2000; // reset to "no signal" after 2s with no reading
 
 // ==========================================
-// Ultrasound Sensor — Wangmo 的超声: D8 数字读 40kHz 有/无
+// Ultrasound sensor (rock type): digital read on D8 -> 40kHz present/absent
 // ==========================================
-const int US_PIN = 8;                   // D8 (空闲数字口; 原 snippet 用 pin2=左电机, 已改 D8) 
+const int US_PIN = 8;                   // D8
 
 // ==========================================
 // 2. WiFi Configuration
 // ==========================================
 const char ssid[] = "EEERover";
 const char pass[] = "exhibition";
-const int groupNumber = 10; 
+const int groupNumber = 10;
 
 WiFiWebServer server(80);
 
 // ==========================================
-// 3. Web UI Frontend 
+// 3. Web UI Frontend
 // ==========================================
 const char webpage[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
@@ -84,6 +82,7 @@ const char webpage[] PROGMEM = R"rawliteral(
 <body oncontextmenu="return false;">
   <h2>Lunar Rover PRO V5</h2>
   <div id="connection-indicator" style="font-size:18px; font-weight:bold; color:#f44336; margin-bottom:15px;">❌ Disconnected</div>
+  <div id="rock-id" style="font-size:16px; font-weight:bold; color:#FFD54F; margin-bottom:15px;">—</div>
 
   <div class="grid">
     <button id="btn-fl" class="btn" onmousedown="startMove('/forward_left')" ontouchstart="startMove('/forward_left')">&#8598;</button>
@@ -135,18 +134,18 @@ const char webpage[] PROGMEM = R"rawliteral(
 
     setInterval(function() {
       var pxhttp = new XMLHttpRequest(); pxhttp.open('GET', '/ping?t=' + new Date().getTime(), true); pxhttp.timeout = 500;
-      pxhttp.onload = function() { 
-        document.getElementById('connection-indicator').innerHTML = '✅ Connected'; 
-        document.getElementById('connection-indicator').style.color = '#4CAF50'; 
+      pxhttp.onload = function() {
+        document.getElementById('connection-indicator').innerHTML = '✅ Connected';
+        document.getElementById('connection-indicator').style.color = '#4CAF50';
       };
       pxhttp.onerror = function() {
-        document.getElementById('connection-indicator').innerHTML = '❌ Disconnected'; 
-        document.getElementById('connection-indicator').style.color = '#f44336'; 
+        document.getElementById('connection-indicator').innerHTML = '❌ Disconnected';
+        document.getElementById('connection-indicator').style.color = '#f44336';
       };
       pxhttp.send();
     }, 1000);
 
-    // 轮询传感器 (红外 + 磁场 + 年龄), 更新仪表盘
+    // Poll sensors and update the dashboard
     setInterval(function() {
       var irx = new XMLHttpRequest(); irx.open('GET', '/ir?t=' + new Date().getTime(), true); irx.timeout = 800;
       irx.onload = function() { if (irx.status == 200) document.getElementById('ir-val').innerHTML = irx.responseText; };
@@ -160,9 +159,12 @@ const char webpage[] PROGMEM = R"rawliteral(
       var usx = new XMLHttpRequest(); usx.open('GET', '/us?t=' + new Date().getTime(), true); usx.timeout = 800;
       usx.onload = function() { if (usx.status == 200) document.getElementById('us-val').innerHTML = usx.responseText; };
       usx.send();
+      var rkx = new XMLHttpRequest(); rkx.open('GET', '/rock?t=' + new Date().getTime(), true); rkx.timeout = 800;
+      rkx.onload = function() { if (rkx.status == 200) document.getElementById('rock-id').innerHTML = rkx.responseText; };
+      rkx.send();
     }, 1000);
 
-    function startMove(cmd) { 
+    function startMove(cmd) {
       if (currentAction !== cmd) {
         var log = document.createElement('div');
         log.innerHTML = "> " + cmd;
@@ -170,15 +172,15 @@ const char webpage[] PROGMEM = R"rawliteral(
         currentAction = cmd;
       }
       document.getElementById('status-box').innerHTML = "Sending: " + cmd;
-      sendCmd(cmd); 
-      clearInterval(timer); 
-      timer = setInterval(function() { sendCmd(cmd); }, 200); 
+      sendCmd(cmd);
+      clearInterval(timer);
+      timer = setInterval(function() { sendCmd(cmd); }, 200);
     }
 
-    function stopMove() { 
-      clearInterval(timer); 
+    function stopMove() {
+      clearInterval(timer);
       currentAction = "";
-      sendCmd('/stop'); 
+      sendCmd('/stop');
     }
 
     // WASD & Arrow Keys Support
@@ -188,7 +190,7 @@ const char webpage[] PROGMEM = R"rawliteral(
       var bwd = keyState['s'] || keyState['arrowdown'];
       var lft = keyState['a'] || keyState['arrowleft'];
       var rgt = keyState['d'] || keyState['arrowright'];
-      
+
       var cmd = "/stop";
       if (fwd && lft) cmd = "/forward_left";
       else if (fwd && rgt) cmd = "/forward_right";
@@ -203,7 +205,7 @@ const char webpage[] PROGMEM = R"rawliteral(
     }
 
     document.addEventListener('keydown', function(e) {
-      if (e.target && e.target.tagName === 'INPUT') return; // 在数值框里打字时别触发开车
+      if (e.target && e.target.tagName === 'INPUT') return; // don't drive while typing in a field
       var key = e.key.toLowerCase();
       if (keyState[key] !== undefined && !keyState[key]) {
         keyState[key] = 1; processKeys();
@@ -219,13 +221,13 @@ const char webpage[] PROGMEM = R"rawliteral(
     document.addEventListener('mouseup', stopMove);
     document.addEventListener('touchend', stopMove);
 
-    // 调速: 滑块 + 数值框联动, 数值夹在 60–255 之间
+    // Speed control: slider + number box, clamped 60-255
     var speedSlider = document.getElementById('speed-slider');
     var speedNum = document.getElementById('speed-num');
     function clampSpeed(v) {
       v = parseInt(v, 10);
-      if (isNaN(v)) v = parseInt(speedSlider.value, 10); // 空着/乱填 -> 回退当前值
-      return Math.max(60, Math.min(255, v));             // >255 拉回 255, <60 拉到 60
+      if (isNaN(v)) v = parseInt(speedSlider.value, 10); // fall back to current value
+      return Math.max(60, Math.min(255, v));             // clamp to 60-255
     }
     function applySpeed(v) {
       speedSlider.value = v;
@@ -235,9 +237,9 @@ const char webpage[] PROGMEM = R"rawliteral(
       sx.open('GET', '/speed?v=' + v + '&t=' + new Date().getTime(), true);
       sx.send();
     }
-    speedSlider.addEventListener('input', function() { speedNum.value = this.value; });            // 拖动实时同步数字
+    speedSlider.addEventListener('input', function() { speedNum.value = this.value; });            // live-sync number box
     speedSlider.addEventListener('change', function() { applySpeed(clampSpeed(this.value)); this.blur(); });
-    speedNum.addEventListener('change', function() { applySpeed(clampSpeed(this.value)); });        // 回车/失焦时夹值并发送
+    speedNum.addEventListener('change', function() { applySpeed(clampSpeed(this.value)); });        // clamp + send on enter/blur
   </script>
 </body>
 </html>
@@ -247,76 +249,76 @@ const char webpage[] PROGMEM = R"rawliteral(
 // 4. Core Motor Functions
 // ==========================================
 unsigned long lastCmdTime = 0;
-const unsigned long WATCHDOG_TIMEOUT = 500; 
+const unsigned long WATCHDOG_TIMEOUT = 500;
 
 void replyAPI(const String& msg) {
-  server.sendHeader(F("Access-Control-Allow-Origin"), F("*")); 
+  server.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
   server.send(200, F("text/plain"), msg);
 }
 
-void setMotor(int dirPin, int enPin, int speed) {  
+void setMotor(int dirPin, int enPin, int speed) {
   if (speed == 0) {
-    analogWrite(enPin, 0); 
-  } else if (speed > 0) {  
-    digitalWrite(dirPin, HIGH); // 调整逻辑：现在 HIGH 对应前进
-    analogWrite(enPin, speed);  
-  } else {  
-    digitalWrite(dirPin, LOW);  // 调整逻辑：现在 LOW 对应后退
-    analogWrite(enPin, -speed); 
-  }  
+    analogWrite(enPin, 0);
+  } else if (speed > 0) {
+    digitalWrite(dirPin, HIGH); // HIGH = forward
+    analogWrite(enPin, speed);
+  } else {
+    digitalWrite(dirPin, LOW);  // LOW = reverse
+    analogWrite(enPin, -speed);
+  }
 }
 
 void stopBoth() { setMotor(DIR_LEFT, EN_LEFT, 0); setMotor(DIR_RIGHT, EN_RIGHT, 0); }
-void moveForward() { 
+void moveForward() {
   Serial.println("Cmd: Forward");
-  setMotor(DIR_LEFT, EN_LEFT, SPEED); setMotor(DIR_RIGHT, EN_RIGHT, SPEED); 
-  lastCmdTime = millis(); replyAPI(F("Fwd")); 
+  setMotor(DIR_LEFT, EN_LEFT, SPEED); setMotor(DIR_RIGHT, EN_RIGHT, SPEED);
+  lastCmdTime = millis(); replyAPI(F("Fwd"));
 }
-void moveBackward() { 
+void moveBackward() {
   Serial.println("Cmd: Backward");
-  setMotor(DIR_LEFT, EN_LEFT, -SPEED); setMotor(DIR_RIGHT, EN_RIGHT, -SPEED); 
-  lastCmdTime = millis(); replyAPI(F("Rev")); 
+  setMotor(DIR_LEFT, EN_LEFT, -SPEED); setMotor(DIR_RIGHT, EN_RIGHT, -SPEED);
+  lastCmdTime = millis(); replyAPI(F("Rev"));
 }
-void turnLeft() { 
+void turnLeft() {
   Serial.println("Cmd: Left");
-  setMotor(DIR_LEFT, EN_LEFT, -SPEED); setMotor(DIR_RIGHT, EN_RIGHT, SPEED); 
-  lastCmdTime = millis(); replyAPI(F("Left")); 
+  setMotor(DIR_LEFT, EN_LEFT, -SPEED); setMotor(DIR_RIGHT, EN_RIGHT, SPEED);
+  lastCmdTime = millis(); replyAPI(F("Left"));
 }
-void turnRight() { 
+void turnRight() {
   Serial.println("Cmd: Right");
-  setMotor(DIR_LEFT, EN_LEFT, SPEED); setMotor(DIR_RIGHT, EN_RIGHT, -SPEED); 
-  lastCmdTime = millis(); replyAPI(F("Right")); 
+  setMotor(DIR_LEFT, EN_LEFT, SPEED); setMotor(DIR_RIGHT, EN_RIGHT, -SPEED);
+  lastCmdTime = millis(); replyAPI(F("Right"));
 }
-void curveForwardLeft() { 
+void curveForwardLeft() {
   int inner = (SPEED * 4) / 10;
   Serial.print("Cmd: Curve Fwd Left (L:"); Serial.print(inner); Serial.println(", R:200)");
-  setMotor(DIR_LEFT, EN_LEFT, inner); setMotor(DIR_RIGHT, EN_RIGHT, SPEED); 
-  lastCmdTime = millis(); replyAPI("C-FL (" + String(inner) + "/200)"); 
+  setMotor(DIR_LEFT, EN_LEFT, inner); setMotor(DIR_RIGHT, EN_RIGHT, SPEED);
+  lastCmdTime = millis(); replyAPI("C-FL (" + String(inner) + "/200)");
 }
-void curveForwardRight() { 
+void curveForwardRight() {
   int inner = (SPEED * 4) / 10;
   Serial.print("Cmd: Curve Fwd Right (L:200, R:"); Serial.print(inner); Serial.println(")");
-  setMotor(DIR_LEFT, EN_LEFT, SPEED); setMotor(DIR_RIGHT, EN_RIGHT, inner); 
-  lastCmdTime = millis(); replyAPI("C-FR (200/" + String(inner) + ")"); 
+  setMotor(DIR_LEFT, EN_LEFT, SPEED); setMotor(DIR_RIGHT, EN_RIGHT, inner);
+  lastCmdTime = millis(); replyAPI("C-FR (200/" + String(inner) + ")");
 }
-void curveBackwardLeft() { 
+void curveBackwardLeft() {
   int inner = (SPEED * 4) / 10;
   Serial.print("Cmd: Curve Bwd Left (L:"); Serial.print(-inner); Serial.println(", R:-200)");
-  setMotor(DIR_LEFT, EN_LEFT, -inner); setMotor(DIR_RIGHT, EN_RIGHT, -SPEED); 
-  lastCmdTime = millis(); replyAPI("C-BL (" + String(-inner) + "/-200)"); 
+  setMotor(DIR_LEFT, EN_LEFT, -inner); setMotor(DIR_RIGHT, EN_RIGHT, -SPEED);
+  lastCmdTime = millis(); replyAPI("C-BL (" + String(-inner) + "/-200)");
 }
-void curveBackwardRight() { 
+void curveBackwardRight() {
   int inner = (SPEED * 4) / 10;
   Serial.print("Cmd: Curve Bwd Right (L:-200, R:"); Serial.print(-inner); Serial.println(")");
-  setMotor(DIR_LEFT, EN_LEFT, -SPEED); setMotor(DIR_RIGHT, EN_RIGHT, -inner); 
-  lastCmdTime = millis(); replyAPI("C-BR (-200/" + String(-inner) + ")"); 
+  setMotor(DIR_LEFT, EN_LEFT, -SPEED); setMotor(DIR_RIGHT, EN_RIGHT, -inner);
+  lastCmdTime = millis(); replyAPI("C-BR (-200/" + String(-inner) + ")");
 }
-void stopRover() { 
+void stopRover() {
   Serial.println("Cmd: Stop");
-  stopBoth(); replyAPI(F("Stop")); 
+  stopBoth(); replyAPI(F("Stop"));
 }
 
-void handleRoot() { 
+void handleRoot() {
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
   server.send(200, F("text/html"), "");
   int totalLength = sizeof(webpage) - 1;
@@ -329,7 +331,7 @@ void handleRoot() {
     chunkBuffer[currentChunkSize] = '\0';
     server.sendContent(chunkBuffer);
     bytesSent += currentChunkSize;
-    delay(20); 
+    delay(20);
   }
   server.sendContent("");
 }
@@ -338,12 +340,12 @@ void handlePing() { server.send(200, F("text/plain"), F("pong")); }
 
 void handleSpeed() {
   if (server.hasArg("v")) {
-    SPEED = constrain(server.arg("v").toInt(), 60, 255); // 下限 60 防止电机堵转; 太低不动就把这个数调大
+    SPEED = constrain(server.arg("v").toInt(), 60, 255); // clamp 60-255 (too low stalls the motors)
   }
   replyAPI(String(SPEED));
 }
 
-// 红外三档: <240 -> No IR, 240-400 -> 312, >400 -> 547 (右边再跟实测速率)
+// IR tiers by pulse rate: <240 = No IR, 240-400 = 312/s, >400 = 547/s
 String irStatus() {
   if (IRpulseRate > 400)       return "547";
   else if (IRpulseRate >= 240) return "312";
@@ -351,7 +353,7 @@ String irStatus() {
 }
 void handleIR() { replyAPI(irStatus() + " - " + String((int)IRpulseRate) + "/s"); }
 
-// 磁场: >680 上(N), <560 下(S), 中间无 (右边跟原始 ADC 值)
+// Magnetism by ADC value: >680 = Up (N), <560 = Down (S), else None
 String magStatus() {
   int v = analogRead(MAG_PIN);
   String dir;
@@ -362,18 +364,40 @@ String magStatus() {
 }
 void handleMag() { replyAPI(magStatus()); }
 
-void handleAge() { replyAPI(String(lastAge)); }   // 返回最近一条年龄读数
+void handleAge() { replyAPI(String(lastAge)); }   // latest age reading
 
-// 超声: D8 数字读, HIGH=检测到 40kHz, LOW=无
+// Ultrasound: HIGH = 40kHz detected, LOW = none
 String usStatus() { return digitalRead(US_PIN) == HIGH ? "Detected" : "None"; }
 void handleUS() { replyAPI(usStatus()); }
+
+// Rock type from IR + ultrasound + magnetism (spec table); "Unknown" if no match
+String rockType() {
+  bool ir547   = IRpulseRate > 400;
+  bool ir312   = IRpulseRate >= 240 && IRpulseRate <= 400;
+  bool us      = digitalRead(US_PIN) == HIGH;
+  int  mv      = analogRead(MAG_PIN);
+  bool magUp   = mv > 680;
+  bool magDown = mv < 560;
+  if (magDown && ir547 &&  us) return "Basaltoid";
+  if (magDown && ir312 && !us) return "Gravion";
+  if (magUp   && ir312 &&  us) return "Regolix";
+  if (magUp   && ir547 && !us) return "Lunarite";
+  return "Unknown";
+}
+// /rock: combine type with the radio age -> "<age> yr <type>" (type only if no age yet)
+void handleRock() {
+  String t = rockType();
+  if (t == "Unknown") { replyAPI("Unknown"); return; }
+  if (strcmp(lastAge, "no signal") == 0) { replyAPI(t); return; }
+  replyAPI(String(lastAge) + " yr " + t);
+}
 
 void setup() {
   pinMode(DIR_LEFT, OUTPUT); pinMode(EN_LEFT, OUTPUT);
   pinMode(DIR_RIGHT, OUTPUT); pinMode(EN_RIGHT, OUTPUT);
-  stopBoth(); 
+  stopBoth();
   Serial.begin(9600);
-  Serial1.begin(600);     // Zifan 年龄: 石头 UART 600bps 从 D0(RX) 进
+  Serial1.begin(600);     // age UART (rock) on D0 RX
   pinMode(IR_PIN, INPUT);
   attachInterrupt(digitalPinToInterrupt(IR_PIN), countPulse, RISING);
   pinMode(MAG_PIN, INPUT);
@@ -387,6 +411,7 @@ void setup() {
   server.on("/mag", handleMag);
   server.on("/age", handleAge);
   server.on("/us", handleUS);
+  server.on("/rock", handleRock);
   server.on("/forward", moveForward);
   server.on("/backward", moveBackward);
   server.on("/left", turnLeft);
@@ -400,10 +425,10 @@ void setup() {
 }
 
 void loop() {
-  server.handleClient(); 
+  server.handleClient();
   if (millis() - lastCmdTime > WATCHDOG_TIMEOUT) { stopBoth(); }
 
-  // 红外: 每 ~500ms 用实际经过时间算脉冲率 (count/time, 自带时间补偿)。窗口 200→500ms (Chris 更新: 计数更多, 速率更稳)
+  // IR: every ~500ms, pulse rate = pulse count / elapsed time
   unsigned long irElapsed = millis() - lastIRTime;
   if (irElapsed >= 500) {
     noInterrupts();
@@ -415,23 +440,22 @@ void loop() {
     if (Serial) { Serial.print("IR rate: "); Serial.print((int)IRpulseRate); Serial.print("/s -> "); Serial.println(irStatus()); }
   }
 
-  // Radio/Age: 判定① 只收数字(非数字如 '?'、符号跳过); 判定② 换行/'#'(一条读数结束)才更新显示
-  //            -> 网页稳定显示完整一条, 不再每来一个数字就闪半截。每轮限读 32 字节防卡死。
+  // Radio/age: accumulate digits, commit a reading on newline/'#', max 32 bytes per loop
   int ageBudget = 32;
   while (Serial1.available() && ageBudget-- > 0) {
     char c = Serial1.read();
-    if (c == '#' || c == '\n' || c == '\r') {     // 换行/# = 一条读数结束
-      if (ageLen > 0) {                            // 判定②: 收完整了才把这一条更新到显示
+    if (c == '#' || c == '\n' || c == '\r') {     // end of a reading
+      if (ageLen > 0) {                            // commit the completed reading
         ageBuf[ageLen] = '\0';
         strncpy(lastAge, ageBuf, AGE_BUF - 1); lastAge[AGE_BUF - 1] = '\0';
-        lastAgeCommit = millis();                  // 记下最近一条完整读数的时刻 (超时基准)
+        lastAgeCommit = millis();                  // timestamp for timeout
       }
-      ageLen = 0;                                  // 开新一条
-    } else if (c >= '0' && c <= '9') {             // 判定①: 只累积数字 (非数字 ?、符号跳过, 不立即刷新)
+      ageLen = 0;                                  // start next reading
+    } else if (c >= '0' && c <= '9') {             // keep digits only
       if (ageLen < AGE_BUF - 1) ageBuf[ageLen++] = c;
     }
   }
-  // 判定③: 超过 2s 没有新的完整读数 (石头拿开/没信号) -> 清屏 no signal, 不卡在上一条
+  // reset to "no signal" after AGE_TIMEOUT with no new reading
   if (lastAgeCommit != 0 && (millis() - lastAgeCommit) > AGE_TIMEOUT && strcmp(lastAge, "no signal") != 0) {
     strncpy(lastAge, "no signal", AGE_BUF - 1); lastAge[AGE_BUF - 1] = '\0';
   }
