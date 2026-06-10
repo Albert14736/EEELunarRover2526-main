@@ -1,5 +1,11 @@
 # EEERover Specifications and Technical Guide
 
+## 💻 Our Code
+
+**All of our code is in 👉 [Sync files on GitHub/Tasks](Sync%20files%20on%20GitHub/Tasks)** — the rover's movement & web UI, plus each team member's sensor test code.
+
+---
+
 This GitHub project contains information to help get you started on the EEESeaBoat project
 
 You will find
@@ -26,9 +32,3 @@ You can fill in the task by yourself, cause I'm just copying the format you use 
 - [Interim Presentation](Sync%20files%20on%20GitHub/Projects/Interim%20Presentation.md) - [To be filled]
 - [Report](Sync%20files%20on%20GitHub/Projects/Report.md) - [To be filled]
 - [Parts Tracker](Sync%20files%20on%20GitHub/Tasks/Parts%20Tracker.md) - [To be filled]
-
----
-
-## 💻 Code
-
-All of our code lives in **[Sync files on GitHub/Tasks](Sync%20files%20on%20GitHub/Tasks)** — the rover's movement & web UI, plus each team member's sensor test code.
