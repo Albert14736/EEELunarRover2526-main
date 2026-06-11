@@ -5,8 +5,8 @@
 // ==========================================
 // 1. Motor pin definitions
 // ==========================================
-const int EN_LEFT   = 2;  // left motor PWM
-const int DIR_LEFT  = 3;  // left motor direction
+const int EN_LEFT   = 3;  // left motor PWM (D3 — D2 has no PWM on the M0, so swapped with DIR)
+const int DIR_LEFT  = 2;  // left motor direction (D2, digital only)
 const int EN_RIGHT  = 4;  // right motor PWM
 const int DIR_RIGHT = 6;  // right motor direction
 
@@ -30,23 +30,27 @@ const int MAG_PIN = A4;                // A4
 // Radio / age: Serial1 (D0 RX) at 600 baud, ASCII digits per reading
 // ==========================================
 const int AGE_BUF = 40;
-char ageBuf[AGE_BUF];                   // reading currently being accumulated
+char ageBuf[AGE_BUF];                   // digit run currently being accumulated
 int  ageLen = 0;
-char lastAge[AGE_BUF] = "no signal";    // latest complete reading (served on /age)
-unsigned long lastAgeCommit = 0;        // time of last complete reading (for timeout)
-const unsigned long AGE_TIMEOUT = 2000; // reset to "no signal" after 2s with no reading
+// Mode filter: keep recent 3-digit readings in a 2s window, serve the most frequent
+// one. The '#'-delimited stream is noisy (44/445/4443), so corrupt variants lose the vote.
+const unsigned long AGE_WIN = 2000;     // voting window (ms)
+const int AGE_N = 64;                   // ring buffer capacity
+int           ageVals[AGE_N];           // recent 3-digit reading values (0..999)
+unsigned long ageTimes[AGE_N] = {0};    // their arrival times (0 = empty slot)
+int           ageHead = 0;
 
 // ==========================================
 // Ultrasound sensor (rock type): digital read on D8 -> 40kHz present/absent
 // ==========================================
-const int US_PIN = 8;                   // D8
+const int US_PIN = 12;                   // D8 (moved back after the hardware fix)
 
 // ==========================================
 // 2. WiFi Configuration
 // ==========================================
-const char ssid[] = "EEERover";
-const char pass[] = "exhibition";
-const int groupNumber = 10;
+const char ssid[] = "Albert iPhone";   // iPhone Personal Hotspot
+const char pass[] = "12345678";
+const int groupNumber = 10;            // (only used for the lab EEERover static IP)
 
 WiFiWebServer server(80);
 
@@ -132,10 +136,14 @@ const char webpage[] PROGMEM = R"rawliteral(
       xhttp.send();
     }
 
+    var minRtt = 99999;
     setInterval(function() {
-      var pxhttp = new XMLHttpRequest(); pxhttp.open('GET', '/ping?t=' + new Date().getTime(), true); pxhttp.timeout = 500;
+      var t0 = new Date().getTime();
+      var pxhttp = new XMLHttpRequest(); pxhttp.open('GET', '/ping?t=' + t0, true); pxhttp.timeout = 500;
       pxhttp.onload = function() {
-        document.getElementById('connection-indicator').innerHTML = '✅ Connected';
+        var rtt = new Date().getTime() - t0;
+        if (rtt < minRtt) minRtt = rtt;
+        document.getElementById('connection-indicator').innerHTML = '✅ Connected · ' + rtt + ' ms (min ' + minRtt + ')';
         document.getElementById('connection-indicator').style.color = '#4CAF50';
       };
       pxhttp.onerror = function() {
@@ -145,24 +153,24 @@ const char webpage[] PROGMEM = R"rawliteral(
       pxhttp.send();
     }, 1000);
 
-    // Poll sensors and update the dashboard
+    // Poll all sensors in one combined request (cuts the per-second 5-request burst).
+    // SENSOR_POLL_MS is the only knob: lower = fresher dashboard but more socket
+    // contention with drive commands; higher = snappier control. 250ms is the balance.
+    var SENSOR_POLL_MS = 250;
     setInterval(function() {
-      var irx = new XMLHttpRequest(); irx.open('GET', '/ir?t=' + new Date().getTime(), true); irx.timeout = 800;
-      irx.onload = function() { if (irx.status == 200) document.getElementById('ir-val').innerHTML = irx.responseText; };
-      irx.send();
-      var mgx = new XMLHttpRequest(); mgx.open('GET', '/mag?t=' + new Date().getTime(), true); mgx.timeout = 800;
-      mgx.onload = function() { if (mgx.status == 200) document.getElementById('mag-val').innerHTML = mgx.responseText; };
-      mgx.send();
-      var agx = new XMLHttpRequest(); agx.open('GET', '/age?t=' + new Date().getTime(), true); agx.timeout = 800;
-      agx.onload = function() { if (agx.status == 200) document.getElementById('age-val').innerHTML = agx.responseText; };
-      agx.send();
-      var usx = new XMLHttpRequest(); usx.open('GET', '/us?t=' + new Date().getTime(), true); usx.timeout = 800;
-      usx.onload = function() { if (usx.status == 200) document.getElementById('us-val').innerHTML = usx.responseText; };
-      usx.send();
-      var rkx = new XMLHttpRequest(); rkx.open('GET', '/rock?t=' + new Date().getTime(), true); rkx.timeout = 800;
-      rkx.onload = function() { if (rkx.status == 200) document.getElementById('rock-id').innerHTML = rkx.responseText; };
-      rkx.send();
-    }, 1000);
+      var sx = new XMLHttpRequest(); sx.open('GET', '/sensors?t=' + new Date().getTime(), true); sx.timeout = 800;
+      sx.onload = function() {
+        if (sx.status != 200) return;
+        var p = sx.responseText.split('|');
+        if (p.length < 5) return;
+        document.getElementById('ir-val').innerHTML = p[0];
+        document.getElementById('mag-val').innerHTML = p[1];
+        document.getElementById('us-val').innerHTML = p[2];
+        document.getElementById('age-val').innerHTML = p[3];
+        document.getElementById('rock-id').innerHTML = p[4];
+      };
+      sx.send();
+    }, SENSOR_POLL_MS);
 
     function startMove(cmd) {
       if (currentAction !== cmd) {
@@ -174,7 +182,7 @@ const char webpage[] PROGMEM = R"rawliteral(
       document.getElementById('status-box').innerHTML = "Sending: " + cmd;
       sendCmd(cmd);
       clearInterval(timer);
-      timer = setInterval(function() { sendCmd(cmd); }, 20);
+      timer = setInterval(function() { sendCmd(cmd); }, 200);
     }
 
     function stopMove() {
@@ -249,7 +257,7 @@ const char webpage[] PROGMEM = R"rawliteral(
 // 4. Core Motor Functions
 // ==========================================
 unsigned long lastCmdTime = 0;
-const unsigned long WATCHDOG_TIMEOUT = 100;
+const unsigned long WATCHDOG_TIMEOUT = 500;
 
 void replyAPI(const String& msg) {
   server.sendHeader(F("Access-Control-Allow-Origin"), F("*"));
@@ -353,43 +361,104 @@ String irStatus() {
 }
 void handleIR() { replyAPI(irStatus() + " - " + String((int)IRpulseRate) + "/s"); }
 
-// Magnetism by ADC value: >680 = Up (N), <560 = Down (S), else None
+// Magnetism thresholds (single source of truth, shared with rockType)
+bool magIsNorth(int v) { return v > 620; }
+bool magIsSouth(int v) { return v < 600; }
+
+// Magnetism by ADC value: >620 = Up (N), <600 = Down (S), else None
 String magStatus() {
   int v = analogRead(MAG_PIN);
   String dir;
-  if (v > 680)      dir = "UP (North)";
-  else if (v < 560) dir = "DOWN (South)";
-  else              dir = "None";
+  if (magIsNorth(v))      dir = "UP (North)";
+  else if (magIsSouth(v)) dir = "DOWN (South)";
+  else                    dir = "None";
   return dir + " - " + String(v);
 }
 void handleMag() { replyAPI(magStatus()); }
 
-void handleAge() { replyAPI(String(lastAge)); }   // latest age reading
+// Most frequent 3-digit reading within the last AGE_WIN ms ("no signal" if none).
+String ageBest() {
+  unsigned long now = millis();
+  int bestVal = -1, bestCount = 0;
+  for (int i = 0; i < AGE_N; i++) {
+    if (ageTimes[i] == 0 || now - ageTimes[i] > AGE_WIN) continue;
+    int c = 0;
+    for (int j = 0; j < AGE_N; j++)
+      if (ageTimes[j] != 0 && now - ageTimes[j] <= AGE_WIN && ageVals[j] == ageVals[i]) c++;
+    if (c > bestCount) { bestCount = c; bestVal = ageVals[i]; }
+  }
+  if (bestVal < 0) return "no signal";
+  char b[4] = { (char)('0' + (bestVal / 100) % 10),
+                (char)('0' + (bestVal / 10) % 10),
+                (char)('0' + bestVal % 10), 0 };
+  return String(b);
+}
+// Insert the decimal point for display: 3-digit age "444" -> "4.44" (voting/judgment unchanged).
+String ageDot() {
+  String a = ageBest();
+  if (a == "no signal") return a;
+  return a.substring(0, 1) + "." + a.substring(1);
+}
+void handleAge() { replyAPI(ageDot()); }   // dotted age, e.g. "4.44"
 
 // Ultrasound: HIGH = 40kHz detected, LOW = none
 String usStatus() { return digitalRead(US_PIN) == HIGH ? "Detected" : "None"; }
 void handleUS() { replyAPI(usStatus()); }
 
-// Rock type from IR + ultrasound + magnetism (spec table); "Unknown" if no match
+// Rock type from IR + ultrasound + magnetism (spec table).
+// Any 2 of the 3 signals uniquely identify a rock, so we score each rock by how
+// many of its 3 signature conditions match and accept the one scoring >=2. One
+// neutral reading (e.g. magnet in the dead zone) still classifies on the other
+// two; a flipped reading that ties two rocks stays "Unknown" (no guessing).
+struct RockSig { const char* name; bool ir547; bool usYes; bool magUp; };
 String rockType() {
-  bool ir547   = IRpulseRate > 400;
-  bool ir312   = IRpulseRate >= 240 && IRpulseRate <= 400;
-  bool us      = digitalRead(US_PIN) == HIGH;
-  int  mv      = analogRead(MAG_PIN);
-  bool magUp   = mv > 680;
-  bool magDown = mv < 560;
-  if (magDown && ir547 &&  us) return "Basaltoid";
-  if (magDown && ir312 && !us) return "Gravion";
-  if (magUp   && ir312 &&  us) return "Regolix";
-  if (magUp   && ir547 && !us) return "Lunarite";
+  bool ir547 = IRpulseRate > 400;
+  bool ir312 = IRpulseRate >= 240 && IRpulseRate <= 400;
+  bool usYes = digitalRead(US_PIN) == HIGH;
+  int  mv    = analogRead(MAG_PIN);
+  bool magUp = magIsNorth(mv);
+  bool magDn = magIsSouth(mv);
+
+  static const RockSig sigs[4] = {
+    {"Basaltoid", true,  true,  false},   // 547 / 40kHz / Down
+    {"Gravion",   false, false, false},   // 312 /  --   / Down
+    {"Regolix",   false, true,  true },   // 312 / 40kHz / Up
+    {"Lunarite",  true,  false, true },   // 547 /  --   / Up
+  };
+  int bestScore = 0, bestIdx = -1;
+  bool tie = false;
+  for (int i = 0; i < 4; i++) {
+    int s = 0;
+    if (sigs[i].ir547 ? ir547 : ir312)  s++;
+    if (sigs[i].usYes ? usYes : !usYes) s++;
+    if (sigs[i].magUp ? magUp : magDn)  s++;
+    if (s > bestScore)       { bestScore = s; bestIdx = i; tie = false; }
+    else if (s == bestScore) { tie = true; }
+  }
+  if (bestIdx >= 0 && bestScore >= 2 && !tie) return sigs[bestIdx].name;
   return "Unknown";
 }
-// /rock: combine type with the radio age -> "<age> yr <type>" (type only if no age yet)
-void handleRock() {
+// Rock display: type + radio age -> "<age> billion years old  <type>" (type only if no age yet)
+String rockDisplay() {
   String t = rockType();
-  if (t == "Unknown") { replyAPI("Rock type: Unknown"); return; }
-  if (strcmp(lastAge, "no signal") == 0) { replyAPI(t); return; }
-  replyAPI(String(lastAge) + " yr " + t);
+  if (t == "Unknown") return "Rock type: Unknown";
+  String age = ageDot();
+  if (age == "no signal") return t;
+  return age + " billion years old  " + t;
+}
+void handleRock() { replyAPI(rockDisplay()); }
+
+// One combined snapshot of every sensor, '|' separated: ir|mag|us|age|rock.
+// Lets the dashboard refresh all readings in a single request instead of five,
+// removing the per-second 5-request burst that was delaying drive commands.
+void handleSensors() {
+  String out = irStatus() + " - " + String((int)IRpulseRate) + "/s";
+  out += "|" + magStatus();
+  out += "|" + usStatus();
+  String ad = ageDot();
+  out += "|" + (ad == "no signal" ? ad : ad + " billion years");
+  out += "|" + rockDisplay();
+  replyAPI(out);
 }
 
 void setup() {
@@ -402,8 +471,12 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(IR_PIN), countPulse, RISING);
   pinMode(MAG_PIN, INPUT);
   pinMode(US_PIN, INPUT);
-  WiFi.config(IPAddress(192, 168, 0, groupNumber + 1));
+  // iPhone hotspot subnet is 172.20.10.0/28, gateway 172.20.10.1. Static IP so the
+  // browser URL stays fixed: http://172.20.10.10  (config order: ip, dns, gateway, subnet)
+  WiFi.config(IPAddress(172, 20, 10, 10), IPAddress(172, 20, 10, 1),
+              IPAddress(172, 20, 10, 1), IPAddress(255, 255, 255, 240));
   while (WiFi.begin(ssid, pass) != WL_CONNECTED) { delay(500); }
+  Serial.print("Rover IP: "); Serial.println(WiFi.localIP());
   server.on("/", handleRoot);
   server.on("/ping", handlePing);
   server.on("/speed", handleSpeed);
@@ -412,6 +485,7 @@ void setup() {
   server.on("/age", handleAge);
   server.on("/us", handleUS);
   server.on("/rock", handleRock);
+  server.on("/sensors", handleSensors);
   server.on("/forward", moveForward);
   server.on("/backward", moveBackward);
   server.on("/left", turnLeft);
@@ -440,23 +514,21 @@ void loop() {
     if (Serial) { Serial.print("IR rate: "); Serial.print((int)IRpulseRate); Serial.print("/s -> "); Serial.println(irStatus()); }
   }
 
-  // Radio/age: accumulate digits, commit a reading on newline/'#', max 32 bytes per loop
+  // Radio/age: collect digits; any non-digit ('#', '?', line noise) ends a reading.
+  // Stream is '#'-delimited with no newlines. 3-digit readings vote in the 2s buffer;
+  // ageBest() returns the most frequent (noise variants lose).
   int ageBudget = 32;
   while (Serial1.available() && ageBudget-- > 0) {
     char c = Serial1.read();
-    if (c == '#' || c == '\n' || c == '\r') {     // end of a reading
-      if (ageLen > 0) {                            // commit the completed reading
-        ageBuf[ageLen] = '\0';
-        strncpy(lastAge, ageBuf, AGE_BUF - 1); lastAge[AGE_BUF - 1] = '\0';
-        lastAgeCommit = millis();                  // timestamp for timeout
+    if (c >= '0' && c <= '9') {
+      if (ageLen < AGE_BUF - 1) ageBuf[ageLen++] = c;
+    } else {                                       // any non-digit ends a reading
+      if (ageLen == 3) {                           // only 3-digit readings vote
+        ageVals[ageHead] = (ageBuf[0]-'0')*100 + (ageBuf[1]-'0')*10 + (ageBuf[2]-'0');
+        ageTimes[ageHead] = millis();
+        ageHead = (ageHead + 1) % AGE_N;
       }
       ageLen = 0;                                  // start next reading
-    } else if (c >= '0' && c <= '9') {             // keep digits only
-      if (ageLen < AGE_BUF - 1) ageBuf[ageLen++] = c;
     }
-  }
-  // reset to "no signal" after AGE_TIMEOUT with no new reading
-  if (lastAgeCommit != 0 && (millis() - lastAgeCommit) > AGE_TIMEOUT && strcmp(lastAge, "no signal") != 0) {
-    strncpy(lastAge, "no signal", AGE_BUF - 1); lastAge[AGE_BUF - 1] = '\0';
   }
 }
