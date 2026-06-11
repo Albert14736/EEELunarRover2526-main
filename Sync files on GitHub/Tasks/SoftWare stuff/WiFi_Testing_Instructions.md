@@ -48,7 +48,7 @@ Please connect the motor driver (H-Bridge) to the Metro M0 board exactly as foll
 ### Alternative: Previewing the UI Remotely
 You can preview the UI anytime, anywhere, using the public link below. This is great for checking the look and feel, but it won't actually control the rover.
 
-**Public URL:** `https://Albert14736.github.io/EEELunarRover2526-main/Sync%20files%20on%20GitHub/Tasks/Movement%20Code/remote_ui_test.html`
+**Public URL:** `https://Albert14736.github.io/EEELunarRover2526-main/Sync%20files%20on%20GitHub/Tasks/SoftWare%20stuff/remote_ui_test.html`
 
 ## Phase 4: Execution & Observation Checklist
 
