@@ -48,8 +48,8 @@ const int US_PIN = 12;                   // D8 (moved back after the hardware fi
 // ==========================================
 // 2. WiFi Configuration
 // ==========================================
-const char ssid[] = "Albert iPhone";   // iPhone Personal Hotspot
-const char pass[] = "12345678";
+const char ssid[] = "CKJE";   // iPhone Personal Hotspot
+const char pass[] = "1234567890";
 const int groupNumber = 10;            // (only used for the lab EEERover static IP)
 
 WiFiWebServer server(80);
